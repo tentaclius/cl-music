@@ -96,8 +96,8 @@
              :note-fn (f_ [:freq (midicps (+ 26 (sc *pentatonic* _)))]))
   (λ(i)
     (sim 
-         (seql (loop :repeat 8 :collect (funcall bass-seq)))
-         )))
+      (seql (loop :repeat 8 :collect (funcall bass-seq)))
+      )))
 
 (bass :start 4)
 (bass :stop)

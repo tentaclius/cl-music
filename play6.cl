@@ -28,7 +28,7 @@
 
 (def bass-seq (gen-list (euclidian 11 18 0 5)))
 
-(defpattern ssw :inf
+(defpattern ssw
   (play-note 'ssw
              :attr [:a 0.007]
              :note-fn (f_ [:freq (midicps (+ (cpsmidi 55) 0 (sc *pentatonic* _)))]))
@@ -45,8 +45,7 @@
 (proxy :drums-fx
        (-<> (in.ar drums-fx 2)
             ;(+ <> (* 1/3 (allpass-n.ar <> 4 0.20 2)))
-            (fold.ar -0.1 0.2)
-            (* 0.2)
+            ;(fold.ar -0.1 0.1)
             ):pos :tail)
 
 (defsynth noise ((freq 440) (amp 0.3) (out 0) (gate 1) (a 0.0001) (d 0.02) (r 0.0001))
@@ -56,7 +55,7 @@
        pan2.ar (out.ar out <>)))
 
 (defpattern drums
-  (play-drum :out 0)
+  (play-drum :out drums-fx)
   (λ(i)
     (let ((o nil)
           (d ['bd :dur 0.02 :freq 220])
