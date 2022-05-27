@@ -9,6 +9,9 @@ Playing with cl-collider, building my framework around it along the way.
   (lambda (beat duration event)  ;; a function to process the note and run corresponding synths, see (play-note) and (play-drum)
     ...)
   (lambda (i)  ;; a function to generate a pattern. Use (seq ...) for sequential events and (sim ...) for simultaneous,
-    ...)       ;; combine them recursively. There are also some useful macros to extend the pattern beyond the beat, e.g.
+    ...))       ;; combine them recursively. There are also some useful macros to extend the pattern beyond the beat, e.g.
                ;; (per-beat ...) and (once-every ...).
 ```
+
+This macro expands to a temporally-recursive function named <pattern-name>, which can be started with
+`(<pattern-name> :start quant repetitions)`. `quant` and `repetitions` are optional. Default `quant` is 1 and default number of reps is +inf+.
