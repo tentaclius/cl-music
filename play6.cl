@@ -70,17 +70,6 @@
 (drums :stop 4)
 
 
-(defpattern sinosc
-  (play-note 'ssin
-             :release t
-             :attr [:out drums-fx]
-             :note-fn (λ(n) [:freq (midicps (+ 54 (sc *pentatonic* n)))]))
-  (λ(i)
-    (seq 0 0 1 3)))
-
-(sinosc :start)
-(sinosc :stop)
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; System
 

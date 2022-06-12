@@ -1,4 +1,4 @@
-(load "~/src/mus/lib.cl")
+(load "lib.cl")
 (in-package :sc-user)
 (ql:quickload :ltk)
 (use-package :sc-extensions)
@@ -60,9 +60,6 @@
 
 (drums :stop)
 (ssw :stop)
-
-(ssw :stop 16)
-(drums :stop 8)
 
 ;;;
 

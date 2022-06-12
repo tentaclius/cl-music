@@ -17,6 +17,7 @@
           (* 1 (in.ar drone-bus 2))
           ;(* (line.kr 0 1 5) (in.ar bass-bus 2))
           (* 1 (in.ar bass-bus 2))
+          ;(* (line.kr 0 1 5) (in.ar drums-bus 2))
           (* 1 (in.ar drums-bus 2))
           ) :pos :tail)
 
@@ -56,7 +57,7 @@
   (play-drum :out drums-bus)
   (λ(i) (let ((b ['bd :dur 0.02 :amp 1]))
           (sim (once-every i 4 0 (seq nil nil nil (seq 'hh 'hh)))
-               (seq nil ['snare :amp 0.6 :d 0.1])
+               ;(seq nil ['snare :amp 0.6 :d 0.1])
                (per-beat i
                          (seq b b))
                ))))
@@ -83,9 +84,9 @@
               pan2.ar (out.ar out <>)))))
 
 (defpattern ssw
-  (play-note 'ssw
-             :attr [:out bass-bus :amp 0.4 :a 0.001 :r 0.001]
-             ;:synth-fn (λ(s e) [(apply #'synth (cons s e)) (apply #'synth (cons 'ssaw (mergeplist e [:amp 0.5])))])
+  (play-note 'fm-bass
+             :attr [:out bass-bus :q 1 :depth 200 :amp 0.3 :a 0.0001 :r 0.01]
+             ;:synth-fn (λ(b d s e) [(apply #'synth (cons s e)) (apply #'synth (cons 'ssaw (mergeplist e [:amp 0.5])))])
              :note-fn (f_ [:freq (midicps (+ 55 -19 (sc *pentatonic* _)))]))
   (λ(i)
     (per-beat i

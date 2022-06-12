@@ -1093,14 +1093,6 @@
 
 ;;======
 
-(defsynth boo ((freq (midicps 50)) (out 0) (gate 1) (amp 0.3))
-  (-<> (sin-osc.ar freq)
-       (+ (* 0.05 (pink-noise.ar)))
-       (* amp)
-       (* (env-gen.kr (perc 0.01 0.4) :act :free :gate gate))
-       pan2.ar
-       (out.ar out <>)))
-
 (defsynth bum ((out 0) (amp 0.7) (f1 200) (f2 20) (d 1/6))
   (-<> (x-line.kr f1 f2 d)
        sin-osc.ar
@@ -1109,6 +1101,10 @@
        pan2.ar
        (out.ar out <>)
        ))
+
+(synth 'bum)
+
+(synth 'bd)
 
 (defsynth click ((out 0) (amp 0.4) (freq (midicps 74)))
   (-<> (sin-osc.ar freq)

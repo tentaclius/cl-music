@@ -19,7 +19,8 @@
 (use-package :f-underscore)
 ;
 (shadowing-import '(alexandria:flatten alexandria:curry alexandria:compose
-                                       alexandria:if-let alexandria:when-let alexandria:random-elt alexandria:shuffle alexandria:rotate
+                                       alexandria:if-let alexandria:when-let alexandria:when-let*
+                                       alexandria:random-elt alexandria:shuffle alexandria:rotate
                                        generators:make-generator generators:next generators:yield
                                        bdef:bdef bdef:bdef-metadata
                                        trivia:match
@@ -64,7 +65,7 @@
 (defmacro λ (&rest body) `(lambda ,@body))
 
 (defmacro def (&rest pairs)
-  `(progn ,@(loop :for (k v) :on pairs :by #'cddr :collect `(defparameter ,k ,v))))
+  `(progn ,@(loop :for (k v) :on pairs :by #'cddr :collect `(if (boundp ',k) (setf ,k ,v) (defparameter ,k ,v)))))
 
 (defmacro spawn (&body body)
   `(bordeaux-threads:make-thread (lambda() ,@body)))
@@ -183,10 +184,11 @@
 ;               (setf ,i (1+ ,i))
 ;               (clock-add next-beat #',name next-beat (1+ ,j)))))))))
 (defmacro defpattern (pattern-name a-synth-fn a-pattern-fn)
-  (let ((pattern-fn (gensym)) (synth-fn (gensym)))
+  (let ((pattern-fn (read-from-string (cat pattern-name "-pattern")))
+        (synth-fn   (read-from-string (cat pattern-name "-synth"))))
     `(progn
-       (defparameter ,pattern-fn ,a-pattern-fn)
-       (defparameter ,synth-fn ,a-synth-fn)
+       (def ,pattern-fn ,a-pattern-fn)
+       (def ,synth-fn ,a-synth-fn)
        (let ((i 0)
              (repeats +inf+)
              (stop-quant nil))
@@ -223,23 +225,25 @@
                     (clock-add next-beat #',pattern-name next-beat (1+ j)))))))))))
 
 (defun play-note (snth &key 
-                       (synth-fn (lambda(s e) (when (and s e) [(apply #'synth (cons s e))])))
+                       (synth-fn (lambda(b d s e) (declare (ignorable b d)) (when (and s e) (at-beat b (apply #'synth (cons s e))))))
                        (note-fn (lambda(e) [:freq (midicps e)])) (release t) attr)
   (lambda (b d e)
     (declare (ignorable b d))
     (when e
-      (let ((s (typecase e
-                 (%snt [(apply #'synth (cons (slot-value e 'synth) (slot-value e 'data)))])
-                 (function (funcall e b d))
-                 (list (funcall synth-fn snth (append (funcall note-fn (car e)) (mergeplist attr (cdr e)))))
-                 (t (funcall synth-fn snth (append (funcall note-fn e) attr))))))
+      (let* ((start (+ b (or (and (listp e) (getf (cdr e) :start))
+                             (getf attr :start 0))))
+             (s (typecase e
+                  (%snt [(apply #'synth (cons (slot-value e 'synth) (slot-value e 'data)))])
+                  (function (funcall e b d))
+                  (list (funcall synth-fn start d snth (append (funcall note-fn (car e)) (mergeplist attr (cdr e)))))
+                  (t (funcall synth-fn start d snth (append (funcall note-fn e) attr))))))
         (when release 
           (let ((dur (or (and (listp e) (getf (cdr e) :dur))
                          (getf attr :dur d))))
             (if (listp s)
-                (at-beat (+ b dur) (mapcar (λ(s) (when (and s (equal 'cl-collider::node (type-of s))) (release s))) s))
+                (at-beat (+ start dur) (mapcar (λ(s) (when (and s (equal 'cl-collider::node (type-of s))) (release s))) s))
                 (when (equal 'cl-collider::node (type-of s))
-                  (at-beat (+ b dur) (release s))))))))))
+                  (at-beat (+ start dur) (release s))))))))))
 
 (defun play-ctrl (prx &optional (default-ctl :freq) (release-p t))
   (λ(b d e)
@@ -331,6 +335,24 @@
   (lambda ()
     (random-elt lst)))
 
+(let ((buses (make-hash-table)))
+  (defun cbus (name)
+    (busnum (if-let ((val (gethash name buses)))
+                    val (setf (gethash name buses) (bus-control)))))
+  (defun cbus-set (name value)
+    (control-set (cbus name) value))
+  (defun cbus-get (name)
+    (control-get (cbus name)))
+  (defun cbus-in (name)
+    (in.kr (cbus name)))
+  (defun cbus-out (name val)
+    (out.kr (cbus name) val)))
+
+(let ((buses (make-hash-table)))
+  (defun abus (name)
+    (busnum (if-let ((val (gethash name buses)))
+                    val (setf (gethash name buses) (bus-audio :chanls 2))))))
+
 ;; }}}
 
 ;; hash-table literal syntax using braces
@@ -353,6 +375,17 @@
                                     `(setf (gethash ,(car pair) ,retn) ,(cadr pair)))
                                   pairs)
                               ,retn)))))
+
+(defun hshm (&rest args)
+  (let ((h (make-hash-table :test #'equal)))
+    (loop :for (k v) :on args :by #'cddr :do (setf (gethash k h) v))
+    h))
+
+(defun href (map key)
+  (gethash key map))
+
+(defun hset (map key value)
+  (setf (gethash key map) value))
 
 ;; -----------------------------------------------------------------------------------------------------
 ;; Instruments
@@ -387,7 +420,7 @@
          (sig (* sig (env-gen.kr (linen attack (- dur attack release) release) :act :free))))
     (out.ar out (* amp sig)) ))
 
-(defsynth sample-dur-1 ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (dur 60) (attack 0.1) (release 0.1))
+(defsynth sample-dur-1 ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (dur 60) (attack 0.001) (release 0.1))
   (let* ((sig (play-buf.ar 1 buffer (* rate (buf-rate-scale.ir buffer))
                            :start-pos (* start (/ (buf-frames.ir buffer) (buf-channels.ir buffer)))
                            :loop loop
@@ -415,9 +448,11 @@
        pan2.ar (out.ar out <>)))
 
 (defsynth ssaw ((freq 440) (freq0 440) (slide 0) (out 0) (amp 0.5) (gate 1)
-                        (a 0.01) (d 0.2) (s 0.4) (r 0.4))
+                           (lpf 7) (res 1)
+                           (a 0.01) (d 0.2) (s 0.4) (r 0.4))
   (-<> (x-line.kr freq0 freq slide)
        (saw.ar)
+       (rlpf.ar (* freq lpf) res)
        (* amp (env-gen.kr (adsr a d s r) :act :free :gate gate))
        pan2.ar (out.ar out <>)))
 
