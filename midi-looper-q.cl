@@ -13,12 +13,11 @@
 
 (defstruct mr-midi-event
   type
-  note
+  value
   velocity
   start
-  start-beat
   duration)
-;
+
 (defstruct (midi-recorder (:conc-name mr-))
   (start-beat 0)
   (data nil)
@@ -27,20 +26,20 @@
   (quants 4)
   (running-notes (hshm))
   (recordingp nil))
-;
+
 (defun start-midi-recording (self beats quants)
-  (setf (mr-data self) (make-array beats :initial-element nil))
-  (setf (mr-updatebeat self) (make-array beats :initial-element nil))
+  (setf (mr-data self) (make-array (* beats quants) :initial-element nil))
+  (setf (mr-updatebeat self) (make-array (* beats quants) :initial-element nil))
   (setf (mr-beats self) beats)
   (setf (mr-quants self) quants)
   (setf (mr-running-notes self) (hshm))
   (setf (mr-start-beat self) (-> (clock-beats) ceiling))
   (setf (mr-recordingp self) t))
 ;
-;(defun clear-midi-prev-beat (self i beat)
-;  (when-let* ((lastupd (-> self mr-updatebeat (elt i)))
-;              (is-old (< lastupd (floor beat))))
-;    (-> self mr-data (elt i) (setf nil))))
+(defun clear-midi-prev-beat (self i beat)
+  (when-let* ((lastupd (-> self mr-updatebeat (elt i)))
+              (is-old (< lastupd (floor beat))))
+    (-> self mr-data (elt i) (setf nil))))
 ;
 (defun stop-midi-recording (self)
   (setf (mr-recordingp self) nil))
@@ -59,22 +58,22 @@
       (case (mr-midi-event-type event)
         (:note_on
          (setf (mr-midi-event-start event) (clock-beats))
-         (-> self mr-running-notes (hset (mr-midi-event-note event) event)))
+         (-> self mr-running-notes (hset (mr-midi-event-value event) event)))
         (:note_off
-         (when-let* ((note (mr-midi-event-note event))
+         (when-let* ((note (mr-midi-event-value event))
                      (start-event (-> self mr-running-notes (href note)))
                      (start-beat (mr-midi-event-start start-event))
-                     (start-i (floor (mod start-beat (mr-beats self)))))
+                     (start-i (floor (* (mr-quants self)
+                                        (mod (- start-beat (mr-start-beat self))
+                                             (mr-beats self))))))
            (setf (mr-midi-event-duration start-event)
                  (- (clock-beats) start-beat))
-           (setf (mr-midi-event-start start-event) (- start-beat (floor start-beat)))
-           (-<> self mr-data (elt start-i) (push start-event <>))
-           ))
+           (-<> self mr-data (elt start-i) (push start-event <>))))
         (:control
          (-<> self mr-data (elt i) (push event <>)))))))
 
-(defun recall-midi-events (self beat)
-  (let ((i (mod (- beat (mr-start-beat self)) (mr-beats self))))
+(defun recall-midi-events (self beat q)
+  (let ((i (+ q (* (mr-quants self) (mod (- beat (mr-start-beat self)) (mr-beats self))))))
     (-> self mr-data (elt i))))
 
 ;;; IN A RUNNING MIDI ;;;
@@ -112,30 +111,30 @@
        (let ((param (getf event-data 'cl-alsaseq:param))
              (value (getf event-data 'calispel:value)))
          (make-mr-midi-event :type :control
-                             :note param
+                             :value param
                              :velocity value)))
       (:SND_SEQ_EVENT_NOTEON
        (let ((note (getf event-data 'cl-alsaseq:note))
              (velo (getf event-data 'cl-alsaseq:velocity)))
          (make-mr-midi-event :type :note_on
-                             :note note
+                             :value note
                              :velocity velo)))
       (:SND_SEQ_EVENT_NOTEOFF
        (let ((note (getf event-data 'cl-alsaseq:note)))
          (make-mr-midi-event :type :note_off
-                             :note note))))))
+                             :value note))))))
 
 (defun midi-handler (message)
   (handler-case 
       (case (mr-midi-event-type message)
         (:note_on
-         (hset *running-synths* (mr-midi-event-note message)
+         (hset *running-synths* (mr-midi-event-value message)
                (if-let ((dur (mr-midi-event-duration message))
-                        (beat (mr-midi-event-start-beat message)))
-                 (dur beat dur ['ssin :freq (midicps (mr-midi-event-note message)) :amp (/ (mr-midi-event-velocity message) 127)])
-                 (synth 'ssin :freq (midicps (mr-midi-event-note message)) :amp (/ (mr-midi-event-velocity message) 127)))))
+                        (beat (mr-midi-event-start message)))
+                 (dur beat dur ['ssin :freq (midicps (mr-midi-event-value message)) :amp (/ (mr-midi-event-velocity message) 127)])
+                 (synth 'ssin :freq (midicps (mr-midi-event-value message)) :amp (/ (mr-midi-event-velocity message) 127)))))
         (:note_off
-         (when-let ((snt (href *running-synths* (mr-midi-event-note message))))
+         (when-let ((snt (href *running-synths* (mr-midi-event-value message))))
                    (release snt))))
     (error (c) (writeln "ERROR: " c))))
 
@@ -145,18 +144,24 @@
       (midi-handler msg)
       (register-midi-event mr msg))))
 
-(midihelper:stop-midihelper)
 (midihelper:start-midihelper :master 96 'midi-map)
+
+(midihelper:stop-midihelper)
 
 ;;; TESTS ;;;
 
 (defun midi-player (beat i)
   (let ((quantization 24)) (when (not (mr-recordingp mr))
     (start-midi-recording mr 4 quantization))
-    (dolist (m (recall-midi-events mr i))
-          (setf (mr-midi-event-start-beat m) (+ beat (mr-midi-event-start m)))
-          (midi-handler m)))
+  (loop :for j :from 0 :to (1- quantization) :do
+        (dolist (m (recall-midi-events mr i j))
+          (setf (mr-midi-event-start m) (+ beat (/ j quantization)))
+          (midi-handler m)
+          (writeln "MIDI: " m " beat: " beat)
+          )))
   (clock-add (1+ beat) #'midi-player (1+ beat) (1+ i)))
+
+(recall-midi-events mr 0 0)
 
 (def mr (make-midi-recorder))
 (midi-player (clock-quant 4) 0)
@@ -170,5 +175,7 @@
              (seq 'hh))))))
 
 (drums :stop)
+
+(mr-data mr)
 
 (stop)
