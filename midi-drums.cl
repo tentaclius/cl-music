@@ -5,8 +5,6 @@
 (bpm 60)
 (ql:quickload :cl-alsaseq)
 
-(at (+ 0.021 (now)) (synth 'bd))
-
 
 (defsynth synth ((freq 440) (freq0 440) (slide 0) (amp 0.3)
               (out 0) (gate 1)
@@ -57,7 +55,7 @@
              (source (car (getf message :source)))
              (destination (car (getf message :dest))))
         (declare (ignorable source destination))
-        ;(format t "~a: ~s~%" event-type event-data)
+        (format t "~a: ~s~%" event-type event-data)
         (case event-type
           ;; Control event
           (:SND_SEQ_EVENT_CONTROLLER

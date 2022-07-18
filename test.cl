@@ -1,164 +1,231 @@
-(load "~/src/cl-music/lib.cl")
-(in-package :sc-user)
+(require "mylisp" "init.cl")
+(require "midi-looper" "midi-looper.cl")
+(defpackage :play (:use :cl :sc :mylisp :midi-looper))
+(in-package :play)
 (named-readtables:in-readtable :sc)
-(init)   ;; start new server
-;(connect)
-(bpm 60)
-(ql:quickload :cl-alsaseq)
+(sc-init)
+(clock-bpm 60)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defsynth ticks ((freq 440) (dur 0.1) (out 0) (amp 0.4))
+  (-<> (white-noise.ar)
+       (bpf.ar freq)
+       (* amp (env-gen.kr (linen 0.001 dur 0.001) :act :free))
+       pan2.ar (out.ar out <>)))
 
-;; TODO
-;; - compressor
-;; - granular synthesis
-;; - CL FFI, try using libjack midi
-
-(defsynth drone-gain ((hi 0.3) (lo 0.03))
-  (-<> (env-gen.kr (perc 0.01 0.8) :act :free)
-       (* hi) (+ lo)
-       (out.kr (cbus :drone-gain) <>)))
-
-(proxy :drone
-       (-<> (saw.ar 70)
-            (lpf.ar (range (var-saw.kr 0.1) 70 400))
-            (+ (* 0.8 (sin-osc.ar (* 3 70))))
-            (* (in.kr (cbus :drone-gain)))
-            ;(* 0.3)
-            pan2.ar))
-
-(synth 'drone-gain)
-
-(release :drone)
+(defun rep (s n)
+  (seql (loop :repeat n :collect s)))
 
 (defpattern drums
   (play-drum)
-  (λ(j)
+  (λ(i)
     (let ((o nil)
-          (i 'drone-gain))
-      (sim (per-beat j
-             (seq i o i o o i o o)
-             (seq o o o o o o o o)
-             (seq i o o o o i o o)
-             (seq o o o o o o o o))))))
+          (d ['bd :dur 0.1 :amp .4])
+          (h ['hh :dur 0.05]))
+      (sim o
+           (once-every i 4 3 (seq o o (seq h h) o))
+           (per-beat i
+                     (seq d d))))))
+
+(drums :start 1)
+(drums :stop)
+
+(defpattern drums
+  (play-drum)
+  (λ(i)
+    (let ((o nil)
+          (c ['ticks :dur 0.004 :freq 1000 :amp 0.1])
+          (z ['ticks :dur 0.008 :freq 500 :amp 0.1])
+          (d ['bd :dur 0.1 :amp 0.4])
+          (k ['bd :dur 0.1 :amp 0.05])
+          (s ['snare :d 0.1]))
+      (sim (per-beat i
+             (seq d d)
+             (seq d d)
+             (seq d (rep d (rand-el 1 2 4 8 4)))
+             (seq d d))
+           (seq o s)
+           (per-beat i
+             (seq c)
+             (seq (rep ['ticks :dur (/ (random 10) 1000) :freq (+ 400 (random 1000))]
+                       (random 10))
+                  (rep z (random 10))
+                  ))))))
+
+(drums :start 8)
+(drums :stop)
+
+;; nice!
+(proxy :pulse-bass-fx
+       (-<> (abus-in :pulse-bass)
+            (+ <> (* 1/4 (comb-n.ar <> 2 0.19 2)))
+            ;(* 60)
+            ;(fold 0.2 1)
+            ;(/ 10)
+            freeverb.ar
+            ))
+(defsynth pulse-bass ((freq 440) (freq0 440) (slide 0) (amp 0.3)
+              (out (abus :pulse-bass)) (gate 1) (lpf 70)
+              (a 0.001) (d 0.1) (s 0.1) (r 0.5))
+  (let ((fq (x-line.kr freq0 freq slide)))
+    (-<> (pulse.ar fq)
+         (+ (* 1/2 (sin-osc.ar fq)))
+         (+ (* 1/2 (saw.ar (+ fq (* 2 (sin-osc.kr 1.1))))))
+         (rlpf.ar (* fq (x-line.kr 20 6 0.1)) 1.19)
+         (* 1/2 amp (env-gen.kr (adsr a d s r) :gate gate :act :free))
+         pan2.ar (out.ar out <>))))
+
+(dur (clock-beats) 1/6 ['pulse-bass :freq 50 :amp 1])
+
+(defpattern puls
+  (play-note 'pulse-bass
+             :release t
+             :attr []
+             :note-fn (λ(n) [:freq (midicps (+ 54 -12 (sc *pentatonic* n)))]))
+  (λ(i)
+    (per-beat i 
+              (seq 0 2 3 (random 8))
+              (seq 0 1 (random 4) -1))))
+
+(puls :start)
+(puls :stop)
+
+(defpattern drums
+  (play-drum :amp 0.81)
+  (λ(i)
+    (let ((o nil))
+      (sim (once-every i 2 0 (seq o o (seq 'hh 'hh) o))
+           ;(seq o 'snare)
+           (per-beat i
+             (seq 'bd 'bd))))))
 
 (drums :start)
 (drums :stop)
 
-(defpattern drumss
+(release :test)
+
+(defpattern bass
+  (play-note 'pulse-bass
+             :attr [:amp 0.60 :dur 1/14 :a 0.009 :d 0.008 :r .5 :lpf 7]
+             :note-fn (λ(n) [:freq (midicps (+ 60 -24 (sc *minor* n)))]))
+  (λ(i)
+    (per-beat i
+              (seq 0 2 0 0)
+              (seq 1 0 3 4)
+              (seq 0 2 0 3)
+              (seq (random 5) (random 5) 0 0)
+              )))
+
+(bass :start)
+(bass :stop)
+
+(defpattern drums
   (play-drum)
   (λ(i)
-    (let ((o nil)
-          (b ['bd :dur 0.07 :freq 200]))
-      (sim (per-beat i
-             (seq b)
-             (sim b 'snare))))))
+    (let ((o nil))
+      (sim (seq o 'snare)
+           (per-beat i
+             (seq 'bd 'bd))))))
 
-(drumss :start)
-(drumss :stop)
-
-
-(defsynth ssin ((freq 440) (freq0 440) (slide 0) (amp 0.3)
-              (out 0) (gate 1)
-              (a 0.1) (d 0.2) (s 0.7) (r 0.5))
-  (let ((fq (x-line.kr freq0 freq slide)))
-    (-<> (sin-osc.ar fq)
-         (+ (* 1/2 (sin-osc.ar (* fq 1.5))))
-         (+ (* 1/15 (sin-osc.ar (* fq 3))))
-         (* amp (env-gen.kr (perc 0.001 0.4) :gate gate :act :free))
-         pan2.ar (out.ar out <>))))
+(drums :start)
+(drums :stop)
 
 (defpattern ssin
-  (play-note 'ssin :note-fn (λ(n) [:freq (midicps (+ 54 (sc *minor* n)))]))
+  (play-note 'ssin
+             :release t
+             :attr [:r 1 :amp 0.3]
+             :note-fn (λ(n) [:freq (midicps (+ 60 (sc *minor* n)))]))
   (λ(i)
-    (let ((o nil))
-      (sim
-        (per-beat i
-                  (seq 0 2 3 (rand-el 0 3 7))
-                  (seq 0 2 3 (rand-el 0 3 7 5) 3 2))
-        (per-beat i
-                  (seq  0 o o 0)
-                  (seq  o o 2 o )
-                  )))))
+     (per-beat i
+      (seq (sim 0 2 4 6) nil nil (sim 0 2 5))
+      (seq (sim 0 2 4) nil nil)
+      (seq nil nil nil (sim 0 3 4))
+      nil
+      )))
 
 (ssin :start)
 (ssin :stop)
 
-(test :stop)
+(defpattern bass
+  (play-note 'pulse-bass
+             :release t
+             :attr [:out (abus :feedback)]
+             :note-fn (λ(n) [:freq (midicps (+ 60 -24 (sc *pentatonic* n)))]))
+  (λ(i)
+    (per-beat i
+              (seq 0 0 0 0)
+              (seq 0 0 0 0)
+              (seq 0 0 0 0)
+              (seq 0 0 0 0)
+              (seq 2 2 2 2)
+              (seq 2 2 2 2)
+              (seq 3 3 3 3)
+              (seq 1 1 1 1)
+              )))
 
+(bass :start)
+(bass :stop)
 
-;;; Arpegios
-(def arp (gen-list [0 2 4 6 4  7 9 11 13 11  14 16 18 20 18  21 23 25 27]))
+(defpattern ssin
+  (play-note 'pulse-bass
+             :release t
+             :attr [:out (abus :feedback)]
+             :note-fn (λ(n) [:freq (midicps (+ 54 -12 (sc *pentatonic* n)))]))
+  (λ(i)
+    (per-beat i
+              (seq 0 nil 1 2)
+              (seq nil 0 4 nil)
+              (seq 0 6 1 2)
+              (seq nil 0 4 5)
+              )))
 
-(def *root-note* 42)
-(def *root-step* 0)
-(def *arp-delay* 1/8)
+(ssin :start 8)
+(ssin :stop)
 
-(def *arp-running* nil)
+(cbus-set :fb 20)
+(cbus-set :clip 0.5)
+(cbus-set :lpf 300)
 
-(def *arp-running* t)
-(spawn (loop :while *arp-running* :do
-             (pl 'ssin [:freq (-<> (funcall arp) (+ *root-step*) (sc *minor* <>) (+ *root-note*) midicps)] *arp-delay*) (sleep *arp-delay*)))
+(proxy :feedback-eff
+       (-<> (abus-in :feedback)
+            ;(clip (- 0 (cbus-in :clip)) (cbus-in :clip))
+            (lpf.ar (cbus-in :lpf))
+            (+ <> (* 1/10 (comb-n.ar <> 2 0.13 (cbus-in :fb))))
+            )
+       :pos :tail)
 
-(defun pl (snt attrs dur)
-  (spawn (let ((s (apply #'synth (cons snt attrs))))
-           (sleep dur)
-           (release s))))
+;;;
 
+(def *service* (make-instance 'calispel:channel))
+(spawn ;; functionally pure status service
+  (labels ((msg-loop (n)
+             (match (calispel:? *service*)
+                    (:inc (msg-loop (1+ n)))
+                    (:dec (msg-loop (1- n)))
+                    ((list :get ch) (calispel:! ch n) (msg-loop n))
+                    (:get (writeln n) (msg-loop n))
+                    ((list :set x) (msg-loop x))
+                    (t (msg-loop n)))))
+    (msg-loop 0)))
 
-;;; Continuous synths
+(def ch (make-instance 'calispel:channel))
 
-(defsynth wah ((freq 440) (freq0 440) (slide 0) (amp 0.3)
-              (out 0) (gate 1))
-  (let ((fq (x-line.kr freq0 freq slide)))
-    (-<> (dyn-klang.ar [[fq (* fq 2) (* fq 3) (* fq 4) (* fq 5) (* fq 6)]
-                        [(in.kr (cbus :osc1)) (in.kr (cbus :osc2)) (in.kr (cbus :osc3)) (in.kr (cbus :osc4)) (in.kr (cbus :osc5)) (in.kr (cbus :osc6))]])
-         (* (line.kr 0 1 4) amp (env-gen.kr (adsr 2 1/2 1 3) :gate gate :act :free))
-         pan2.ar (out.ar out <>))))
+(calispel:! *service* (list :get ch))
+(calispel:? ch)
 
-(def *running-synths* (hshm))
-(def *pressed-keys*   0)
-(def *scales-conv*    (hshm  112 :osc1  74 :osc2  71 :osc3  76 :osc4  77 :osc5  93 :osc6))
+(calispel:! *service* :inc)
 
-(defun midi-map (messages)
-  (handler-case
-    (dolist (message messages)
-      (let* ((event-type (getf message :event-type))
-             (event-data (getf message :event-data))
-             (source (car (getf message :source)))
-             (destination (car (getf message :dest))))
-        (declare (ignorable source destination))
-        (format t "~a: ~s~%" event-type event-data)
-        (case event-type
-          ;; Control event
-          (:snd_seq_event_controller
-           (when-let* ((param (getf event-data 'cl-alsaseq:param))
-                       (value (getf event-data 'calispel:value))
-                       (scl-n (href *scales-conv* param)))
-             (control-set (cbus scl-n) (float (/ value 127)))
-             (writeln param " " scl-n " " (float (/ value 127)))))
-          ;; Note On
-          (:snd_seq_event_noteon
-           (let ((note (getf event-data 'cl-alsaseq:note))
-                 (velo (getf event-data 'cl-alsaseq:velocity)))
-             (when (<= *pressed-keys* 0)
-               (loop for key being the hash-keys of *running-synths* do
-                     (release (href *running-synths* key)))
-               (setf *running-synths* (hshm)))
-             (hset *running-synths* note (synth 'wah :freq (midicps note) :amp (/ velo 127)))
-             (incf *pressed-keys*)))
-          ;; Note Off
-          (:snd_seq_event_noteoff
-           (let ((note (getf event-data 'cl-alsaseq:note)))
-             (decf *pressed-keys*)))
-          (:SND_SEQ_EVENT_PITCHBEND
-           (let ((bend (getf event-data 'calispel:value)))
-             (control-set (cbus :pitch-bend) (float (/ bend 8192))))))))
-    (error (c) (writeln "ERROR: " c))))
+(match :a (:b 1))
 
-(midihelper:start-midihelper :master 96 'midi-map)
+(calispel:! *chan* 42)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; System
+;;;
 
-(server-query-all-nodes)
+(proxy :test
+       (-<> (saw.ar 220)
+            (+ (saw.ar (+ 220 (* 3.13 (sin-osc.kr 4)))))
+            (* 1/3)
+            pan2.ar))
+
+(release :test)
+
 (stop)

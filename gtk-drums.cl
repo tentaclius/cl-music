@@ -1,83 +1,108 @@
-(load "~/src/cl-music/lib.cl")
-(ql:quickload :cl-cffi-gtk)
-(in-package :sc-user)
-(use-package :gtk)
-(use-package :gdk)
-(use-package :gdk-pixbuf)
-(use-package :gobject)
-(use-package :glib)
-(use-package :gio)
-(use-package :pango)
-(use-package :cairo)
-(use-package :common-lisp)
-(use-package :sc)
-(use-package :sc-user)
-(use-package :sc-extensions)
-(use-package :bdef)
-(named-readtables:in-readtable :sc)
-(init)   ;; start new server
-(bpm 60)
+(load "init.cl")
+(defpackage :play (:use :cl :sc :mylisp))
+(in-package :play)
+(use-gtk)
+(sc-init)
+(clock-bpm 60)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(cbus-set :bd-hi 400)
-(cbus-set :bd-lo 40)
-(cbus-set :bd-dur 0.2)
-(cbus-set :snare-fq 2000)
-(cbus-set :snare-dur 0.2)
+(def sample-bank
+  (->> (list
+          "~/Mus/samples/selection1/000_bas2.wav"
+          "~/Mus/samples/selection1/000_Tom Clap.wav"
+          "~/Mus/samples/selection1/001_011112-melody.wav"
+          "~/Mus/samples/selection1/001_Tom Crash.wav"
+          "~/Mus/samples/selection1/003_abt.wav"
+          "~/Mus/samples/selection1/003_cymrev.wav"
+          "~/Mus/samples/selection1/004_2.wav"
+          "~/Mus/samples/selection1/004_fan.wav"
+          "~/Mus/samples/selection1/004_Tom Openhat.wav"
+          "~/Mus/samples/selection1/005_tankeng.wav"
+          "~/Mus/samples/selection1/007_microsound.wav"
+          "~/Mus/samples/selection1/011_9.wav"
+          "~/Mus/samples/selection1/01.wav"
+          "~/Mus/samples/selection1/1.wav"
+          "~/Mus/samples/selection1/23645_loofa_A_001.wav"
+          "~/Mus/samples/selection1/2.wav"
+          "~/Mus/samples/selection1/3.wav"
+          "~/Mus/samples/selection1/bd.wav"
+          "~/Mus/samples/selection1/crash.wav"
+          "~/Mus/samples/selection1/CSHD0.wav"
+          "~/Mus/samples/selection1/hh.wav"
+          "~/Mus/samples/selection1/kick.wav"
+          "~/Mus/samples/selection1/rave_choir01.ogg"
+          "~/Mus/samples/selection1/rytm-00-hard.wav"
+          "~/Mus/samples/selection1/rytm-01-classic.wav"
+          "~/Mus/samples/selection1/s-bd.wav"
+          "~/Mus/samples/selection1/s-ding.WAV"
+          "~/Mus/samples/selection1/snare.wav"
+          "~/Mus/samples/selection1/VEC1 BD Distortion 06.wav"
+          "~/Mus/samples/selection1/VEC1 BD Distortion 39.wav")
+       (mapcar #'buffer-read)))
 
-(defsynth bd ((d 0.3) (out 0) (amp 0.5))
-  (-<> (x-line.ar (cbus-in :bd-hi) (cbus-in :bd-lo) (cbus-in :bd-dur))
-       (sin-osc.ar)
-       (* amp (env-gen.kr (env [0 1 1 0] [0.0001 (cbus-in :bd-dur) d]) :act :free))
-       pan2.ar (out.ar out <>)))
-;
-(defsynth hh ((out 0) (amp 0.3) (dur 0.1))
+(def sample-bank
+  (vector
+    (buffer-read "/home/aerdman/Mus/samples/sequential/007_Tom Tom2.wav")
+    (buffer-read "/home/aerdman/Mus/samples/sequential/002_Tom Hat Closed.wav")
+    (buffer-read "/home/aerdman/Mus/samples/sequential/006_Tom Tom1.wav")
+    (buffer-read "/home/aerdman/Mus/samples/sequential/003_Tom Kick.wav")
+    (buffer-read "/home/aerdman/Mus/samples/sequential/000_Tom Clap.wav")
+    (buffer-read "/home/aerdman/Mus/samples/sequential/005_Tom Snare.wav")
+    (buffer-read "/home/aerdman/Mus/samples/sequential/004_Tom Openhat.wav")
+    (buffer-read "/home/aerdman/Mus/samples/sequential/001_Tom Crash.wav")
+    ))
+
+(def sample-bank
+  (->> (list
+         "/home/aerdman/Mus/samples/sequential/007_Tom Tom2.wav"
+         "/home/aerdman/Mus/samples/sequential/002_Tom Hat Closed.wav"
+         "/home/aerdman/Mus/samples/sequential/006_Tom Tom1.wav"
+         "/home/aerdman/Mus/samples/sequential/003_Tom Kick.wav"
+         "/home/aerdman/Mus/samples/sequential/000_Tom Clap.wav"
+         "/home/aerdman/Mus/samples/sequential/005_Tom Snare.wav"
+         "/home/aerdman/Mus/samples/sequential/004_Tom Openhat.wav"
+         "/home/aerdman/Mus/samples/sequential/001_Tom Crash.wav")
+       (mapcar #'buffer-read)))
+
+;;;
+
+(defsynth snare ((freq 1100) (amp 0.3)
+              (out 0) (gate 1)
+              (a 0.001) (d 0.2))
   (-<> (white-noise.ar)
-       (hpf.ar 8000)
-       (* amp (env-gen.kr (perc 0.0 dur) :act :free))
+       (lpf.ar freq)
+       (* amp (env-gen.kr (perc a d) :gate gate :act :free))
        pan2.ar (out.ar out <>)))
 ;
-(defsynth snare ((amp 0.3) (out 0) (gate 1))
-  (-<> (white-noise.ar)
-       (lpf.ar (cbus-in :snare-fq))
-       (* amp (env-gen.kr (perc 0.005 (cbus-in :snare-dur)) :gate gate :act :free))
-       pan2.ar (out.ar out <>)))
-;
-(defsynth ssin ((freq 440) (freq0 440) (slide 0) (amp 0.3) (out 0))
-  (-<> (dyn-klang.ar [[freq (* 1.5 freq)] [0.7 0.4]]) 
-       (* amp (env-gen.kr (perc 0.007 1) :act :free))
-       pan2.ar (out.ar out <>)))
+(defsynth ssin ((freq 440) (freq0 440) (slide 0) (amp 0.3)
+              (out 0) (gate 1)
+              (a 0.1) (d 0.2) (s 0.7) (r 0.5))
+  (let ((fq (x-line.kr freq0 freq slide)))
+    (-<> (sin-osc.ar fq)
+         (+ (* 1/2 (sin-osc.ar (* fq 1.5))))
+         (+ (* 1/10 (sin-osc.ar (* fq 3))))
+         (* amp (env-gen.kr (perc 0.001 0.4) :gate gate :act :free))
+         pan2.ar (out.ar out <>))))
 
-(synth 'ssin :freq (midicps 60))
-
-;; piano keyboard
-;(def *key-map* (let ((table (make-hash-table :test 'equal)))
-;                 (loop :for c :across "zsxdcvgbhnjm,l.;/" :for i :from 0
-;                       :do (setf (gethash (string c) table) i))
-;                 (loop :for c :across "q2w3er5t6y7ui9o0p[=" :for i :from 12
-;                       :do (setf (gethash (string c) table) i))
-;                 (-> "=" (gethash table)
-;                     (setf (λ(&optional key)
-;                             (when (< *root-note* 60) (setf *root-note* (+ *root-note* 12))))))
-;                 (-> "-" (gethash table)
-;                     (setf (λ(&optional key)
-;                             (when (> *root-note* 20) (setf *root-note* (- *root-note* 12))))))
-;                 table))
 
 (def *root-note* 60)
 (def *running-synths* (hshm))
-(def *key-map* (hshm 44 (λ() (synth 'bd))
+(def *key-map* (hshm 44  (λ() (synth 'bd))
                      108 (λ() (synth 'bd))
-                     46 (λ() (synth 'snare))
-                     59 (λ() (synth 'snare))
-                     47 (λ() (synth 'hh))
-                     39 (λ() (synth 'hh))
+                     46  (λ() (synth 'snare))
+                     59  (λ() (synth 'snare))
+                     47  (λ() (synth 'hh))
+                     39  (λ() (synth 'hh))
                      122 (λ() (synth 'ssin :freq (midicps 60)))
-                     97 (λ() (synth 'ssin :freq (midicps 63)))
+                     97  (λ() (synth 'ssin :freq (midicps 63)))
                      113 (λ() (synth 'ssin :freq (midicps 65)))))
 
-(synth 'ssin :freq (midicps 60))
+(def *key-map* (hshm))
+(loop :for key :in (list 122 120 99 118 98 110 109 44 46 47 97 115 100 102 103 104 106 107 108 59 39 92 113 119 101 114
+                         116 121 117 105 111 112 91 93 49 50 51 52 53 54 55 56 57 48 45 61)
+      :for sample :in sample-bank
+      :do (hset *key-map* key (let ((s sample) (k key)) (λ() (csnt k (synth 'sample-1 :buffer s))))))
 
 (defun on-key-press (self event)
   (declare (ignorable self))

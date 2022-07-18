@@ -17,17 +17,11 @@
             (+ <> (* 2/3 (allpass-n.ar <> 4 0.17 1)))
             (freeverb.ar)
             ) :pos :tail)
-
-(free :key-pad-synth-fx)
-
 (defsynth keys ((gate 1) (freq 440) (amp 0.5) (out (abus :key-pad)))
   (-<> (dyn-klang.ar [[freq (* freq 2) (* freq 3)] [1/2 1/4 1/8]])
        ;(+ (-> (white-noise.ar) (bpf.ar freq) (* 1/10)))
        (* amp (env-gen.kr (adsr 0.008 0.1 0.8 0.2) :act :free :gate gate))
        pan2.ar (out.ar out <>)))
-
-(synth 'keys)
-(stop)
 
 (defsynth key-pad-synth ((gate 1) (freq 440) (amp 0.5) (out 0))
   (-<> (saw.ar freq)

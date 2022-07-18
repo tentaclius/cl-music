@@ -26,7 +26,6 @@
 ;;;;
 
 (def buf (buffer-read "/home/aerdman/Mus/1.wav"))
-
 (defsynth drone ((out 0) (amp 0.9) (gate 1))
   (-<> (warp1.ar
          1                    ;; number of channels

@@ -21,8 +21,6 @@
 ;; stop every instance
 (mapcar #'server-quit (all-running-servers))
 
-(all-running-servers)
-
 (server-query-all-nodes)
 (group-free-all)
 (stop 1)
