@@ -193,4 +193,6 @@
 (cl-alsaseq:send-note 127 60 0 :SND_SEQ_EVENT_NOTEON
            (midi-reader-seq mh) (midi-reader-out-port mh))
 
+(send-note-on mr 60 127 0)
+
 (stop-midi-reader mh)

@@ -228,4 +228,35 @@
 
 (release :test)
 
+;;;
+
+(defsynth recorder ((bus 1) (buffer 0) (attack 0.001) (release 0.1) (dur 5))
+  (record-buf.ar (in.ar bus)
+                 buffer
+                 :run (env-gen.kr (linen 0 dur 0)
+                                  :gate (changed.ar (in.ar bus))
+                                  :act :free)))
+
+(def sample-rate 48000)
+(def buf (buffer-alloc (* 70 sample-rate)))
+
+(def bus (bus-audio))
+
+(proxy :test
+       (-<> (sin-osc.ar)
+            pan2.ar
+            (* (env-gen.kr (adsr 0.1 0.1 0.3 0.1)
+                           :gate (trig.kr (changed.ar (in.ar bus)) 1)
+                           ))))
+
+(synth 'bd :out bus :dur 1.1)
+
+(synth 'bd :dur 2)
+
+(synth 'recorder :bus bus :buffer buf :dur 2)
+
+(synth 'sample-dur-1 :buffer buf :dur 5)
+
+(server-query-all-nodes)
+
 (stop)
