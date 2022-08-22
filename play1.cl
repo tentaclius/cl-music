@@ -1,4 +1,4 @@
-(load "~/src/mus/lib.cl")
+(load "~/src/cl-music/lib.cl")
 (in-package :sc-user)
 (use-package :sc-extensions)
 (use-package :bdef)
@@ -16,6 +16,13 @@
                       18 :drn1
                       19 :saw
                       16 :drone))
+
+(cbus-set :drums 127)
+(cbus-set :drums-trg 1)
+(cbus-set :drn1 127)
+(cbus-set :drn1-trg 1)
+(cbus-set :drone 127)
+(cbus-set :drone-trg 1)
 
 (proxy :mixer
        (+ (* (in.kr (cbus :drums-trg)) (/ (in.kr (cbus :drums)) 127) (in.ar (abus :drums) 2))
@@ -65,11 +72,11 @@
        (rlpf.ar (range (sin-osc.kr 0.1) 200 1000))
        (freeverb.ar :room 0.7 :mix (line.kr 0.7 0 7))
        (out.ar (abus :drn1) <>)
-       ))
+       ):pos :tail)
 
 (defpattern drn1
   (play-note 'inst1
-             :attr [:out (abus :out1) :amp 0.241 :q 1 :depth 400 :a 0.0001]
+             :attr [:out 0 :amp 0.241 :q 1 :depth 400 :a 0.0001]
              :note-fn (λ(n) [:freq (midicps (+ *root* -12 (my-scale (+ n 0))))]))
   (λ(i) (per-beat i
                   (seq 0 4 6 2 7 6)
@@ -83,8 +90,8 @@
 
 (defpattern ssw
   (play-note 'fm-bass
-             :attr [:out (abus :saw) :amp 0.15 :lpf 5 :q 1 :depth 200]
-             :note-fn (f_ [:freq (fq (+ _ -7))]))
+             :attr [:out 0 :amp 0.15 :lpf 5 :q 1 :depth 200]
+             :note-fn (λ(x) [:freq (fq (+ x -7))]))
   (λ(i) (per-beat i
                   (seq 4 3 0)
                   (seq [0 :freq0 (fq 10) :slide 1/4] [0 :freq0 (fq -5) :slide 1/4] 0)
@@ -102,7 +109,7 @@
               (+ (* 1/4 (sin-osc.ar (* f0 3)) (range (sin-osc.kr 0.11 (* -1/2 pi)) 0.1 0.9)))
               ;(+ (* 1/5 (sin-osc.ar (* f0 4)) (range (sin-osc.kr 0.12 (* -1/2 pi) 0.1 0.9)))
               (+ (* 1/7 (sin-osc.ar (* f0 8)) (range (sin-osc.kr 0.13 (* -1/2 pi)) 0.1 0.9)))
-              (* 0.20)
+              (* 0.40)
               ;(* (line.kr 1 0 5))
               ;(* (line.kr 0 1 5))
               pan2.ar

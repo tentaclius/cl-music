@@ -176,6 +176,36 @@
 
 (snd_seq_event_output *seq* theEvent)
 
+;;;
+
+(ql:quickload :cl-alsaseq)
+(in-package #:cl-alsaseq)
+
+(defparameter SysexLst '(#xF0 #x00 #x20 #x6B #x7F #x42 #x02 #x00 #x10 #x71 #x7F #xF7))
+(defparameter SysexMsg (foreign-alloc :uint8 :initial-contents SysexLst))
+
+(defparameter theEvent (foreign-alloc :uint8 :count 2048))
+
+(with-foreign-slots ((queue type flags (:pointer source) (:pointer dest) (:pointer data))
+                     theEvent (:struct snd_seq_event_t))
+  (setf queue 253)
+  (setf flags 4)
+  (setf type (ev-key-int :SND_SEQ_EVENT_SYSEX))
+  (with-foreign-slots ((port) source (:struct snd_seq_addr_t))
+    (setf port 0))
+  (with-foreign-slots ((client port) dest (:struct snd_seq_addr_t))
+    (setf client SND_SEQ_ADDRESS_SUBSCRIBERS)
+    (setf port SND_SEQ_ADDRESS_UNKNOWN))
+  (with-foreign-slots ((ptr len) data (:struct snd_seq_ev_ext_t))
+    (setf ptr SysexMsg)
+    (setf len 0)))
+
+(defparameter *seq (open-seq "CLsysex"))
+(defparameter *seq* (mem-ref *seq :pointer))
+(defparameter *port* (open-port "out" *seq* :output))
+
+(snd_seq_event_output *seq* theEvent)
+
 ;; SysEx message content from octave change
 ;DBGmess:(:EVENT-TYPE :SND_SEQ_EVENT_PORT_UNSUBSCRIBED :EVENT-DATA
 ;         (CL-ALSASEQ::PORT 0 CL-ALSASEQ::CLIENT 20) :SOURCE
@@ -190,9 +220,45 @@
 
 (start-midi-reader mh #'event-handler)
 
-(cl-alsaseq:send-note 127 60 0 :SND_SEQ_EVENT_NOTEON
-           (midi-reader-seq mh) (midi-reader-out-port mh))
+(start-midi-writer mh)
+
+;;;
+
+(def mh (mk-midi-reader "CLmidi"))
+(def i 1)
+(start-midi-writer mh)
+
+(handler-case
+    (progn 
+      (incf i)
+      (cl-alsaseq:send-note 127 i 0 :SND_SEQ_EVENT_NOTEON
+                          (midi-reader-seq mh) (midi-reader-out-port mh)))
+  (carry-on-writing ()))
+
+    (progn 
+      (incf i)
+      (cl-alsaseq:send-note 127 i 0 :SND_SEQ_EVENT_NOTEON
+                          (midi-reader-seq mh) (midi-reader-out-port mh)))
 
 (send-note-on mr 60 127 0)
 
 (stop-midi-reader mh)
+
+
+
+
+(defparameter *seq (cl-alsaseq:open-seq "CLtest"))
+(defparameter *seq* (cffi:mem-ref *seq :pointer))
+(defparameter *port* (cl-alsaseq:open-port "out" *seq* :duplex))
+(defparameter *sleep* 0.05)
+
+(loop
+  (cl-alsaseq:send-note 127 127 0 :SND_SEQ_EVENT_NOTEON *seq* *port*)
+  (sleep *sleep*)
+  (cl-alsaseq:send-note 0 127 0 :SND_SEQ_EVENT_NOTEON *seq* *port*))
+
+(cl-alsaseq:send-note 127 127 0 :SND_SEQ_EVENT_NOTEON *seq* *port*)
+
+(midihelper:start-midihelper :master 96 'midi-map)
+
+(midihelper:send-event (midihelper:ev-noteon 9 77 120))

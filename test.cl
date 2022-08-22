@@ -242,21 +242,37 @@
 
 (def bus (bus-audio))
 
-(proxy :test
-       (-<> (sin-osc.ar)
-            pan2.ar
-            (* (env-gen.kr (adsr 0.1 0.1 0.3 0.1)
-                           :gate (trig.kr (changed.ar (in.ar bus)) 1)
-                           ))))
 
-(synth 'bd :out bus :dur 1.1)
+(def bf (buffer-read "~/Mus/31seconds.wav"))
+(def bf (buffer-read "~/Mus/1.wav"))
+(def bf (buffer-read "~/Mus/WavePoint-Vocal-AllNightLong.wav"))
+(def bf (buffer-read "~/Mus/prodigyloop.wav"))
 
-(synth 'bd :dur 2)
+(def gn (gen-xrand (list 2 3 4 5 6 7)))
 
-(synth 'recorder :bus bus :buffer buf :dur 2)
+(defpattern smpl
+  (λ(b d e)
+    (when e (at-beat b (synth 'sample-dur :buffer bf
+                              :attack 0.109 :release 0.11
+                              :start (/ 1 (funcall gn)) :dur 0.15
+                              :rate (rand-el 2/3 1/2 1 1.2 1.5)))))
+  (λ(i)
+    (per-beat i 
+              (seql (euclidian 3 8 t))
+              )))
 
-(synth 'sample-dur-1 :buffer buf :dur 5)
+(smpl :start)
+(smpl :stop)
 
-(server-query-all-nodes)
+(defpattern drums
+  (play-drum)
+  (λ(i)
+    (let ((o nil)
+          (d ['bd :dur 0.07]))
+      (sim (per-beat i
+             (seq d 'hh d (seq 'hh 'hh)))))))
+
+(drums :start)
+(drums :stop)
 
 (stop)

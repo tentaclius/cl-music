@@ -1,3 +1,11 @@
+(progn
+  (require "mylisp" "init.cl")
+  (require "midi-looper" "midi-looper.cl")
+  (defpackage :play (:use :cl :sc :mylisp :midi-looper))
+  (in-package :play)
+  (named-readtables:in-readtable :sc)
+  (sc-init)
+  (clock-bpm 60))
 
 (defpattern ssin1
   (play-note 'ssin
@@ -12,7 +20,7 @@
       nil
       )))
 
-(ssin1 :start)
+(ssin1 :start 4)
 (ssin1 :stop)
 
 ;;;
@@ -26,14 +34,14 @@
              :attr [:amp 0.60 :dur 1/14 :a 0.009 :d 0.008 :r .5 :lpf 7 :out (abus :bass)]
              :note-fn (λ(n) [:freq (midicps (+ 60 -24 (sc *pentatonic* n)))]))
   (λ(i)
-    ;(per-beat i
-    ;(seq 0 2 0 0)
-    ;(seq 1 0 3 4)
-    ;)
-    (seq 0 2 0 3  (random 5) (random 5) 0 0)
+    (per-beat i
+    (seq 0 2 0 0)
+    (seq 1 0 3 4)
+    )
+    ;(seq 0 2 0 3  (random 5) (random 5) 0 0)
     ))
 
-(bass :start)
+(bass :start 4)
 (bass :stop)
 
 ;;;
@@ -50,3 +58,5 @@
                      (seq d d))))))
 
 (drums :start)
+
+(stop)

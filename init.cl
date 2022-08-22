@@ -63,17 +63,21 @@
 
 (defmacro λ (&body body) `(lambda ,@body))
 
+(defmacro def (&rest pairs)
+  `(progn ,@(loop :for (k v) :on pairs :by #'cddr :collect `(if (boundp ',k) (setf ,k ,v) (defparameter ,k ,v)))))
+
+(defmacro nlet (tag var-vals &body body)
+  `(labels ((,tag ,(mapcar #'car var-vals) ,@body))
+     (,tag ,@(mapcar #'cadr var-vals))))
+
+(defmacro spawn (&body body)
+  `(bordeaux-threads:make-thread (lambda() ,@body)))
+
 (defun mergeplist (a b)
   (let ((n ()))
     (loop :for (k v) :on a :by #'cddr :do (setf (getf n k) v))
     (loop :for (k v) :on b :by #'cddr :do (setf (getf n k) v))
     n))
-
-(defmacro def (&rest pairs)
-  `(progn ,@(loop :for (k v) :on pairs :by #'cddr :collect `(if (boundp ',k) (setf ,k ,v) (defparameter ,k ,v)))))
-
-(defmacro spawn (&body body)
-  `(bordeaux-threads:make-thread (lambda() ,@body)))
 
 (let ((thread-map (make-hash-table :test #'equal)))
   (defun spawn-named-fn (name fn)
@@ -159,11 +163,10 @@
   (let* ((seq*     (cl-alsaseq:open-seq (midi-reader-name handle)))
          (midi-seq (cffi:mem-ref seq* :pointer))
          (in-port  (cl-alsaseq:open-port (midi-reader-name handle) midi-seq :input))
-         (out-port (cl-alsaseq:open-port (midi-reader-name handle) midi-seq :output)))
+         )
     (setf (midi-reader-seq* handle) seq*)
     (setf (midi-reader-seq handle) midi-seq)
     (setf (midi-reader-in-port handle) in-port)
-    (setf (midi-reader-out-port handle) out-port)
     (spawn-named
       (midi-reader-name handle)
       (loop
@@ -171,20 +174,40 @@
             (when-let
               ((msg (alsa-to-my-midi (cl-alsaseq:recv (midi-reader-seq handle)))))
               (funcall handler msg))
-          (error (c) (format t "ERROR: ~a~%" c)))))))
+          (error (c) (format t "ERROR: ~a~%" c)))))
+    handle))
+
+(defun start-midi-writer (handle)
+  (let* ((seq*     (or (midi-reader-seq* handle) (cl-alsaseq:open-seq (midi-reader-name handle))))
+         (midi-seq (or (midi-reader-seq handle) (cffi:mem-ref seq* :pointer)))
+         (out-port (cl-alsaseq:open-port (format nil (midi-reader-name handle)) midi-seq :output)))
+    (setf (midi-reader-seq* handle) seq*)
+    (setf (midi-reader-seq handle) midi-seq)
+    (setf (midi-reader-out-port handle) out-port)
+    handle))
 
 (defun stop-midi-reader (handle)
   (spawn-named (midi-reader-name handle) nil)
-  (cl-alsaseq:close-port (midi-reader-seq handle) (midi-reader-out-port handle))
-  (cl-alsaseq:close-seq (midi-reader-seq* handle)))
+  (when (midi-reader-in-port handle)
+    (cl-alsaseq:close-port (midi-reader-seq handle) (midi-reader-in-port handle)))
+  (when (midi-reader-out-port handle)
+    (cl-alsaseq:close-port (midi-reader-seq handle) (midi-reader-out-port handle)))
+  (when (midi-reader-seq* handle)
+    (cl-alsaseq:close-seq (midi-reader-seq* handle)))
+  (setf (midi-reader-seq handle) nil)
+  (setf (midi-reader-seq* handle) nil)
+  (setf (midi-reader-in-port handle) nil)
+  (setf (midi-reader-out-port handle) nil))
 
 (defun midi-note-on (handle note &optional (velo 127) (chan 0))
-  (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEON
-                        (midi-reader-seq handle) (midi-reader-out-port handle)))
+  (when (midi-reader-out-port handle)
+    (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEON
+                          (midi-reader-seq handle) (midi-reader-out-port handle))))
 
 (defun midi-note-off (handle note &optional (velo 0) (chan 0))
-  (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEOFF
-                        (midi-reader-seq handle) (midi-reader-out-port handle)))
+  (when (midi-reader-out-port handle)
+    (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEOFF
+                          (midi-reader-seq handle) (midi-reader-out-port handle))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SC HELPERS
@@ -316,6 +339,26 @@
       (if (listp e)
           (apply #'synth (cons (car e) (mergeplist attrs (cdr e))))
           (apply #'synth (cons e attrs))))))
+
+(defun play-seq (synth-fn ptn j)
+  (labels
+      ((dispatch (beat frame seq)
+         (typecase seq
+           (%sim (chord beat frame (seq-data seq)) t)
+           (%seq (sched beat frame (seq-data seq)) t)))
+       (chord (beat frame seq)
+         (loop :for el :in seq :do
+               (or (dispatch beat frame el)
+                   (at-beat beat (funcall synth-fn beat frame el)))))
+       (sched (beat frame seq)
+         (when-let ((delta-t (and (not (null seq)) (/ frame (length seq)))))
+                   (loop :for el :in seq :for j :from 0 :do
+                         (let ((tm (+ beat (* j delta-t))))
+                           (or (dispatch tm delta-t el)
+                               (at-beat tm (funcall synth-fn tm delta-t el))))))))
+    (handler-case
+        (dispatch (clock-beats) 1 (funcall ptn j))
+      (error (c) (writeln "ERROR: " c)))))
 
 (defvar *chromatic* #(0 1 2 3 4 5 6 7 8 9 10 11))
 (defvar *pentatonic* #(0 3 5 7 10))
@@ -452,20 +495,22 @@
          (sig (* sig (env-gen.kr (adsr attack 0.1 1 release) :gate gate :act :free))))
     (out.ar out (* amp (pan2.ar sig))) ))
 
-(defsynth sample-dur ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (dur 60) (attack 0.1) (release 0.1))
+(defsynth sample-dur ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (gate 1) (dur 60) (attack 0.001) (release 0.1))
   (let* ((sig (play-buf.ar 2 buffer (* rate (buf-rate-scale.ir buffer))
                            :start-pos (* start (/ (buf-frames.ir buffer) (buf-channels.ir buffer)))
                            :loop loop
                            :act :free))
-         (sig (* sig (env-gen.kr (linen attack (- dur attack release) release) :act :free))))
+         (sig (* sig (env-gen.kr (linen attack (- dur attack release) release) :act :free)
+                     (env-gen.kr (adsr 0.0001 0.0001 1 release) :gate gate :act :free))))
     (out.ar out (* amp sig)) ))
 
-(defsynth sample-dur-1 ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (dur 60) (attack 0.001) (release 0.1))
+(defsynth sample-dur-1 ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (gate 1) (dur 60) (attack 0.001) (release 0.1))
   (let* ((sig (play-buf.ar 1 buffer (* rate (buf-rate-scale.ir buffer))
                            :start-pos (* start (/ (buf-frames.ir buffer) (buf-channels.ir buffer)))
                            :loop loop
                            :act :free))
-         (sig (* sig (env-gen.kr (linen attack (- dur attack release) release) :act :free))))
+         (sig (* sig (env-gen.kr (linen attack (- dur attack release) release) :act :free)
+                 (env-gen.kr (adsr 0.0001 0.0001 1 release) :gate gate :act :free))))
     (out.ar out (* amp (pan2.ar sig))) ))
 
 (defsynth sample-loop ((buffer 0) (rate 1) (amp 0.5) (out 0)
@@ -530,9 +575,9 @@
        pan2.ar
        (out.ar out <>)))
 
-(defsynth hh ((out 0) (amp 0.3) (dur 0.1))
+(defsynth hh ((out 0) (amp 0.3) (dur 0.1) (freq 8000))
   (-<> (white-noise.ar)
-       (hpf.ar 8000)
+       (hpf.ar freq)
        (* amp (env-gen.kr (perc 0.0 dur) :act :free))
        pan2.ar (out.ar out <>)))
 
@@ -556,17 +601,26 @@
        (+ (* 1/20 (white-noise.ar)))
        (* amp (env-gen.kr (perc 0.001 0.1) :act :free))
        pan2.ar (out.ar out <>)))
-)
+
+(defsynth recorder ((bus 1) (buffer 0) (dur 15))
+  (record-buf.ar (delay-n.ar (in.ar bus 2) 1 0.003)
+                 buffer
+                 :run (env-gen.kr (linen 0 dur 0)
+                                  :gate (changed.ar (in.ar bus 2))
+                                  :act :free)))
+
+) ;; init-synths 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; EXPORTS
 
 (export '(
-          *s* sc-init sc-connect use-gtk λ mergelist def spawn spawn-named writeln cat dur sc seql seq siml sim seq-data snt snx
+          *s* sc-init sc-connect use-gtk λ mergelist def spawn spawn-named writeln cat dur sc seql seq siml sim seq-data play-seq snt snx
           ext-synth rand-el euclidian gen-list gen-rand gen-xrand
           loop-buf.kr loop-buf.ar
           make-mr-midi-event mr-midi-event-type mr-midi-event-note mr-midi-event-velocity mr-midi-event-start mr-midi-event-duration mr-midi-event-channel
-          alsa-to-my-midi mk-midi-reader midi-reader-name midi-reader-seq midi-reader-in-port midi-reader-out-port start-midi-reader stop-midi-reader midi-note-on midi-note-off
+          alsa-to-my-midi mk-midi-reader midi-reader-name midi-reader-seq midi-reader-in-port midi-reader-out-port
+          start-midi-reader start-midi-writer stop-midi-reader midi-note-on midi-note-off
           per-beat once-every defpattern play-note play-drum
           csnt cbus cbuf cbus-set cbus-get cbus-in cbus-in-scale cbus-out abus abus-set abus-get abus-in abus-out
           ;; imported
@@ -574,7 +628,5 @@
           -> ->> -<> -<>> <>
           bdef bdef-metadata bdef-ensure-key match
           *chromatic* *pentatonic* *major* *minor*
-          hshm href hset
-          ? ! channel
+          hshm href hset ? ! channel
           ))
-

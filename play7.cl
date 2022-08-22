@@ -6,7 +6,8 @@
 (bpm 90)
 
 ;;;;
-
+(in-package :play)
+(format t "~a" *package*)
 (def snareBuf (buffer-read "~/Mus/samples/snare.wav"))
 
 (synth 'sample-dur-1 :buffer snareBuf :out 0)
@@ -160,6 +161,18 @@
 (bass :stop)
 
 
+(def bf (buffer-read "~/Mus/28a-prc02-125.wav"))
+(def b1 (buffer-read "~/Mus/31seconds.wav"))
 
+(synth 'sample-dur-1 :buffer b1 :start (/ 1 (random 10)) :dur 0.1)
+
+(defpattern saml
+  (λ(b d e)
+    (synth 'sample-dur-1 :buffer b1 :start (/ 1 (random 10)) :dur 0.1))
+  (λ(i)
+    (seq )))
+
+(saml :start)
+(saml :stop)
 
 (stop)

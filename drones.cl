@@ -16,16 +16,6 @@
              pan2.ar
              )))
 
-(defpattern drone
-  (λ(b d e) (when e 
-              (let ((nn (float (+ 2 (random 12)))))
-                (proxy :drone
-                       (-<> (sin-n nn :freq-fn (λ(i) (* (midicps (- 48 (* 12 1))) i)))
-                            (bpf.ar (range (sin-osc.kr 0.1) 200 1100) (range (sin-osc.kr 0.3) 0.3 0.6))
-                            )))))
-  (λ(i)
-    (seq 1)))
-
 (proxy :drone
        (with-controls ((drone-f (midicps 52)))
          (-<> (sin-osc.ar drone-f)
@@ -143,7 +133,7 @@
               ;(* (line.kr 1 0 5))
               ;(* (line.kr 0 1 5))
               pan2.ar
-              (out.ar (abus :drone) <>)
+              ;(out.ar (abus :drone) <>)
               )))
 
 ;; !
@@ -151,12 +141,12 @@
 (defsynth drone ((out 0) (amp 0.9) (gate 1))
   (-<> (warp1.ar
          1                    ;; number of channels
-         (bufnum buf)    ;; busnum of the bus
+         (bufnum buf)         ;; busnum of the bus
          (range (var-saw.ar 3) 1/8 1/4)    ;; buffer position (pointer)
-         1.01                    ;; frequency scale
+         1.01                 ;; frequency scale
          0.1                  ;; grain window size
          -1                   ;; grain envelope buffnum (-1 = built-in)
-         16                    ;; number of overlapping windows
+         16                   ;; number of overlapping windows
          0.1                  ;; amount of randomness to the windowing functions
          4)
        (bpf.ar (exp (range (var-saw.kr 1/8) (log 200) (log 3000))) 0.22)
@@ -164,7 +154,8 @@
        pan2.ar (out.ar out <>)))
 ;
 (csnt :drone (synth 'drone))
-(csnt :drone1 :stop)
+
+(csnt :drone :stop)
 
 ;; !
 (let ((fq (midicps (- 54 12))))
@@ -172,7 +163,7 @@
        (-<> (mix [(sin-osc.ar fq 0 0.9)
                   (sin-osc.ar (* 2 fq) 0 (var-lag.kr (lf-noise0.kr 5)))
                   (sin-osc.ar (* 3 fq) 0 (var-lag.kr (lf-noise0.kr 5)))
-                  ;(saw.ar (+ 440 (range (var-lag.kr (lf-noise0.kr 4)) -8 5)) 0.4)
+                  (saw.ar (+ 440 (range (var-lag.kr (lf-noise0.kr 4)) -8 5)) 0.1)
                   (-> (saw.ar (+ (* 2/3 fq) (range (var-lag.kr (lf-noise0.kr 4)) -2 2)) 0.7)
                       (lpf.ar (* 2/3 fq 7)))
                   ])

@@ -6,6 +6,8 @@
 (sc-init)
 (clock-bpm 60)
 
+;;;
+
 (proxy :drone
        (-<> (midicps 52)
             (dyn-klang.ar [(mapcar (λ(f) (* f <>)) [1 2 3 4 3/2])
@@ -35,47 +37,58 @@
             (+ <> (* 1/3 (allpass-n.ar <> 4 0.12 2)))
             ):pos :tail)
 (defpattern ssw
-  (play-note 'fm-bass
+  (play-note 'ssw
              :release t
              :attr [:amp 0.4 :dur 1/10 :q 1 :depth 100 :out (abus :ssw)]
              :note-fn (λ(n) [:freq (midicps (+ 52 -12 (sc *pentatonic* n)))]))
   (λ(i)
     (per-beat i
-              (seql (euclidian 5 8 0 2))
-              (seql (euclidian 5 8 0 3))
-              (seql (euclidian 5 8 0 4))
-              (seql (euclidian 5 8 0 5))
-              (seql (euclidian 3 8 1 4))
-              (seql (euclidian 3 8 1 4))
-              (seql (euclidian 3 8 2 5))
-              (seql (euclidian 3 8 2 5))
-              ;(seq 3 0 -1 0 5 4 0 0)
-              ;(seq 0 4 5 0 0 4 0 0)
-              ;(seq (1+ (random 5)) 0 3 0 0 0 1 1)
-              ;(seq 0 0 4 0 1 0 2 0)
+              ;(seql (euclidian 5 8 0 2))
+              ;(seql (euclidian 5 8 0 3))
+              ;(seql (euclidian 5 8 0 4))
+              ;(seql (euclidian 5 8 0 5))
+              ;(seql (euclidian 3 8 1 4))
+              ;(seql (euclidian 3 8 1 4))
+              ;(seql (euclidian 3 8 2 5))
+              ;(seql (euclidian 3 8 2 5))
+              (seq 3 0 -1 0 5 4 0 0)
+              (seq 0 4 5 0 0 4 0 0)
+              (seq (1+ (random 5)) 0 3 0 0 0 1 1)
+              (seq 0 0 4 0 1 0 2 0)
               )))
-
-(ssw :start)
-(ssw :stop)
 
 (defpattern drums
   (play-drum)
   (λ(i)
     (let ((o nil)
-          (d ['bd :amp 0.7])
+          (d ['bd :amp 0.7 :dur 0.125])
           (h ['hh :amp 0.3 :dur 0.05])
-          (s ['snare :d 0.1 :amp 0.6]))
+          (s ['snare :d 0.15 :amp 0.6]))
       (sim (seq o s)
-           (seql (euclidian 3 8 h ['hh :amp 0.3]))
+           ;(seql (euclidian 3 8 h ['hh :amp 0.04]))
            ;(seql (loop :repeat 8 :collect h))
            (per-beat i
              (seq d d)
              (seq d d)
-             (seq d (seq d d o o))
+             )))))
+
+(defpattern drums
+  (play-drum)
+  (λ(i)
+    (let ((o nil)
+          (d ['bd :amp 0.7 :dur 0.125])
+          (h ['hh :amp 0.3 :dur 0.05])
+          (s ['snare :d 0.1 :amp 0.6]))
+      (sim (per-beat i
              (seq d d)
              )))))
 
+(ssw :start)
+(ssw :stop 4)
+
 (drums :start)
 (drums :stop)
+
+(release :drone)
 
 (stop)

@@ -1,10 +1,11 @@
+(progn
 (require "mylisp" "init.cl")
 (require "midi-looper" "midi-looper.cl")
 (defpackage :play (:use :cl :sc :mylisp :midi-looper))
 (in-package :play)
 (named-readtables:in-readtable :sc)
 (sc-init)
-(clock-bpm 60)
+(clock-bpm 60))
 
 ;; DRONE
 (let ((fq (midicps (- 54 12))))
@@ -21,12 +22,15 @@
             splay.ar
             )))
 
+(release :drone)
+
 ;; DRUMS
 (defpattern drums
   (play-drum :amp 0.81)
   (λ(i)
-    (let ((o nil))
-      (sim (once-every i 2 0 (seq o o (seq 'hh 'hh) o))
+    (let ((o nil)
+          (h ['hh :amp 0.2 :dur 0.04]))
+      (sim (once-every i 2 0 (seq o o (seq h h) o))
            ;(seq o 'snare)
            (per-beat i
              (seq 'bd 'bd))))))
@@ -37,10 +41,8 @@
 ;; BASS
 (proxy :pulse-bass-fx
        (-<> (abus-in :pulse-bass)
-            (+ <> (* 1/4 (comb-n.ar <> 2 0.19 2)))
-            ;(* 60)
-            ;(fold 0.2 1)
-            ;(/ 10)
+            ;(+ <> (* 1/4 (comb-n.ar <> 2 0.19 2)))
+            (* 60) (fold -1 1) (/ 40)
             freeverb.ar
             ))
 (defsynth pulse-bass ((freq 440) (freq0 440) (slide 0) (amp 0.3)
@@ -54,13 +56,11 @@
          (* 1/2 amp (env-gen.kr (adsr a d s r) :gate gate :act :free))
          pan2.ar (out.ar out <>))))
 
-(dur (clock-beats) 1/6 ['pulse-bass :freq 50 :amp 1])
-
 (defpattern puls
   (play-note 'pulse-bass
              :release t
              :attr []
-             :note-fn (λ(n) [:freq (midicps (+ 54 -12 (sc *pentatonic* n)))]))
+             :note-fn (λ(n) [:freq (midicps (+ 54 -24 (sc *pentatonic* n)))]))
   (λ(i)
     (per-beat i 
               (seq 0 2 3 (random 8))

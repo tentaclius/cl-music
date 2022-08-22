@@ -207,8 +207,8 @@
                     (cl-alsaseq.quick:send-note-on 127 (+ *root-note* (sc *scale* (- *grid-size* 1 x))) *midi-channel* *seq* *port*)
                     (sleep 0.2)
                     (cl-alsaseq.quick:send-note-off 0 (+ *root-note* (sc *scale* (- *grid-size* 1 x))) *midi-channel* *seq* *port*))))
-              ;(dur beat *synth-dur*
-              ;     (append *synth* [:freq (midicps (+ *root-note* (sc *scale* (- *grid-size* 1 i))))]))
+              (dur beat *synth-dur*
+                   (append *synth* [:freq (midicps (+ *root-note* (sc *scale* (- *grid-size* 1 i))))]))
               ))
   (spawn
     (sleep *init-delay*)

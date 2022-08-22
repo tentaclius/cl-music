@@ -6,6 +6,10 @@
 (init)   ;; start new server
 (bpm 60)
 
+(defpackage :play (:use :cl :sc :mylisp :midi-looper))
+(in-package :play)
+(format t "~a" *test*)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (def sinchord-bus (bus-audio :chanls 2))

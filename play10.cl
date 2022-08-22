@@ -1,10 +1,10 @@
-(load "~/src/cl-music/lib.cl")
-(in-package :sc-user)
+(require "mylisp" "init.cl")
+(require "midi-looper" "midi-looper.cl")
+(defpackage :play (:use :cl :sc :mylisp :midi-looper))
+(in-package :play)
 (named-readtables:in-readtable :sc)
-(init)
-(bpm 60)
-(ql:quickload :cl-alsaseq)
-
+(sc-init)
+(clock-bpm 60)
 
 (defsynth ssw ((freq 440) (freq0 440) (slide 0) (amp 0.3)
               (out 0) (gate 1)
@@ -43,7 +43,7 @@
                   (seq b (seq b b o o)))
         (per-beat i
                   (seq o o o o)
-                  (seq o o h h))))))
+                  (seq o o o o o o h h))))))
 
 (defsynth clear-saw ((freq 440) (freq0 440) (slide 0) (amp 0.3)
               (out 0) (gate 1)
@@ -51,7 +51,7 @@
   (let ((fq (x-line.kr freq0 freq slide)))
     (-<> (* 1/2 (saw.ar fq))
          (+ (sin-osc.ar fq))
-         ;(lpf.ar (* fq 30))
+         (lpf.ar (* fq 30))
          (* amp (env-gen.kr (adsr a d s r) :gate gate :act :free))
          pan2.ar (out.ar out <>))))
 
@@ -71,7 +71,7 @@
 (defpattern clear-saw
   (play-note 'clear-saw
              :release t
-             :attr [:amp 0.06 :dur 1/6]
+             :attr [:amp 0.06 :dur 1/12 :r 0.4 :s 0.3 :d 0.25]
              :note-fn (λ(n) [:freq (midicps (+ 35 12 (sc *pentatonic* (+ n 0))))]))
   (λ(i)
     (per-beat i
