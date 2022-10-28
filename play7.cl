@@ -3,14 +3,12 @@
 (named-readtables:in-readtable :sc)
 (init)   ;; start new server
 
-(bpm 90)
+(clock-bpm 90)
 
 ;;;;
 (in-package :play)
 (format t "~a" *package*)
-(def snareBuf (buffer-read "~/Mus/samples/snare.wav"))
-
-(synth 'sample-dur-1 :buffer snareBuf :out 0)
+(def snareBuf (buffer-read "~/Mus/samples/selection-drums/snare.wav"))
 
 (proxy :key-pad-synth-fx
        (-<> (in.ar (abus :key-pad) 2)
@@ -68,34 +66,34 @@
 (drums :start)
 (drums :stop)
 
-;(defpattern keys
-;  (play-note 'key-pad-synth
-;             :release t
-;             :attr [:amp 0.2]
-;             :synth-fn (λ(b d s e)
-;                         (let ((disp (/ (random 10) 150)))
-;                                     (at-beat (+ b disp) (apply #'synth (cons s e)))))
-;             :note-fn (λ(n) [:freq (midicps (- n 0))]))
-;  (λ(i)
-;    (per-beat i
-;              (sim [64 :dur 1/8 :start 0] [62 :dur 2 :start 3/4])
-;              nil
-;              nil
-;              (seq 54)
-;              (seq [57 :dur 4/3])
-;              (seq nil [52 :dur 4/3])
-;              nil
-;              nil
-;              ;
-;              (sim [64 :dur 1/8 :start 0] [62 :dur 2 :start 3/4])
-;              nil
-;              nil
-;              (seq 54)
-;              (seq [52 :dur 4/3])
-;              (seq nil 54)
-;              (seq 57 54)
-;              (seq 52 59)
-;              )))
+(defpattern keys
+  (play-note 'key-pad-synth
+             :release t
+             :attr [:amp 0.2]
+             :synth-fn (λ(b d s e)
+                         (let ((disp (/ (random 10) 150)))
+                                     (at-beat (+ b disp) (apply #'synth (cons s e)))))
+             :note-fn (λ(n) [:freq (midicps (- n 0))]))
+  (λ(i)
+    (per-beat i
+              (sim [64 :dur 1/8 :start 0] [62 :dur 2 :start 3/4])
+              nil
+              nil
+              (seq 54)
+              (seq [57 :dur 4/3])
+              (seq nil [52 :dur 4/3])
+              nil
+              nil
+              ;
+              (sim [64 :dur 1/8 :start 0] [62 :dur 2 :start 3/4])
+              nil
+              nil
+              (seq 54)
+              (seq [52 :dur 4/3])
+              (seq nil 54)
+              (seq 57 54)
+              (seq 52 59)
+              )))
 
 (drums :start 4)
 (keys :start 4)

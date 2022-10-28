@@ -3,7 +3,8 @@
 (named-readtables:in-readtable :sc)
 (init)   ;; start new server
 ;(connect)
-(bpm 30)
+
+(clock-bpm 30)
 
 ;;;
 

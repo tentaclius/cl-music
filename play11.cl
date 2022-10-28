@@ -76,7 +76,7 @@
   (play-drum)
   (λ(i)
     (let ((o nil)
-          (d ['bd :amp 0.7 :dur 0.125])
+          (d ['bd :amp 0.7 :dur 0.0805])
           (h ['hh :amp 0.3 :dur 0.05])
           (s ['snare :d 0.1 :amp 0.6]))
       (sim (per-beat i

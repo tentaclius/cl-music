@@ -84,10 +84,10 @@
   (play-drum)
   (λ(i)
     (let ((o nil)
-          (d ['bd :dur 0.05 :amp 0.7]))
+          (d ['bd :dur 0.05 :amp 0.4]))
       (sim nil
            (seq nil ['snare :d 0.1])
-           ;(seql (euclidian 3 8 'hh ['hh :amp 0.1]))
+           (seql (euclidian 3 8 'hh ['hh :amp 0.1]))
            (per-beat i
              (seq d d)
              (seq d d)
@@ -97,6 +97,20 @@
 
 (drums :start)
 (drums :stop)
+
+(defpattern bss
+  (play-note 'fm-bass
+             :release t
+             :attr [:q 1  :amp 0.1 :depth 200 ]
+             :note-fn (λ(n) [:freq (midicps (+ 54 -24 (sc *pentatonic* n)))]))
+  (λ(i)
+    (per-beat i
+              (seq 4 3 2 0 1 -2)
+              (seq 0 1 4 (random 6))
+              )))
+
+(bss :start)
+(bss :stop)
 
 (defun midi-player (beat)
   (dolist (m (recall-midi-events mr (ceiling (clock-beats))))
@@ -154,10 +168,10 @@
 (def *init-delay* 0.2)
 (def *light-delay* 0.2)
 (def *midi-channel* 0)
-(def *synth* ['fm-bass :amp 0.5 :q 1 :depth 200])
+(def *synth* ['ssin :amp 0.5 :q 1 :depth 200])
 (def *synth-dur* 0.1)
 (def *scale* *pentatonic*)
-(def *root-note* 33)
+(def *root-note* 54)
 ;
 (defun aref2 (ar i j)
   (aref (aref ar i) j))

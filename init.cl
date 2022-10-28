@@ -33,14 +33,18 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SUPERCOLLIDER INIT
 
+(defvar *sc-started* nil)
+
 (defun sc-init (&optional (port 57110))
-  (setf *sc-plugin-paths* nil)
-  (setf *s* (make-external-server "localhost" :port port
-                                  :server-options (make-server-options :realtime-mem-size (* 65536 4))))
-  (when (null (all-running-servers))
-    (server-boot *s*)
-    (jack-connect)
-    (init-synths)))
+  (when (not *sc-started*)
+    (setf *sc-started* t)
+    (setf *sc-plugin-paths* nil)
+    (setf *s* (make-external-server "localhost" :port port
+                                    :server-options (make-server-options :realtime-mem-size (* 65536 4))))
+    (when (null (all-running-servers))
+      (server-boot *s*)
+      (jack-connect)
+      (init-synths))))
 
 (defun sc-connect (&optional (port 57110))
   (setf *sc-plugin-paths* nil)
@@ -78,6 +82,18 @@
     (loop :for (k v) :on a :by #'cddr :do (setf (getf n k) v))
     (loop :for (k v) :on b :by #'cddr :do (setf (getf n k) v))
     n))
+
+;; easier hash-map syntax
+(defun hshm (&rest args)
+  (let ((h (make-hash-table :test #'equal)))
+    (loop :for (k v) :on args :by #'cddr :do (setf (gethash k h) v))
+    h))
+
+(defun href (map key)
+  (gethash key map))
+
+(defun hset (map key value)
+  (setf (gethash key map) value))
 
 (let ((thread-map (make-hash-table :test #'equal)))
   (defun spawn-named-fn (name fn)
@@ -217,29 +233,71 @@
     (at-beat (+ bt tm) (loop :for synt :in running-synths :do (release synt)))))
 
 (defun sc (scale step)
-  (+ (aref scale (mod step (length scale)))
-     (* 12 (floor (/ step (length scale)))) ))
+  (if (listp step)
+      (mapcar (curry #'sc scale) step)
+      (+ (aref scale (mod step (length scale)))
+         (* 12 (floor (/ step (length scale)))) )))
+
+(let ((running-synths (hshm)))
+  (defun nsynth (name &rest specs)
+    (let* ((s (and (href running-synths name)))
+           (p (and s (is-playing-p s))))
+      (cond
+        ((null specs)
+         (when p (release s))
+         (hset running-synths name nil))
+        ((equal (car specs) :free)
+         (when p (free s))
+         (hset running-synths name nil))
+        ((equal (car specs) :release)
+         (when p (release s))
+         (hset running-synths name nil))
+        (t
+         (when p (release s))
+         (hset running-synths name (apply #'synth specs)))))))
+
+(defun chord (&optional (mod nil) (shift 0) (root 0) (scale *chromatic*))
+  (mapcar
+    (curry (λ(n) (+ root (sc scale (+ n shift)))))
+    (case mod
+      ((nil :3) (list 0 2 4))
+      ((:7)     (list 0 2 4 6))
+      ((:5)     (list 0 4 7))
+      ((:sus4)  (list 0 2 3))
+      ((:sus2)  (list 0 1 4))
+      ((:sus9)  (list 0 4 8))
+      ((:7sus4) (list 0 2 3 6)))))
 
 ;; my sequences
 
 (defclass %seq () (data))
-(defun seql (data)
+(defun seql (&rest data)
   (let ((ss (make-instance '%seq)))
-    (setf (slot-value ss 'data) data)
+    (setf (slot-value ss 'data) (apply #'append data))
     ss))
 (defun seq (&rest data)
   (seql data))
 
 (defclass %sim () (data))
-(defun siml (data)
+(defun siml (&rest data)
   (let ((ss (make-instance '%sim)))
-    (setf (slot-value ss 'data) data)
+    (setf (slot-value ss 'data) (apply #'append data))
     ss))
 (defun sim (&rest data)
   (siml data))
 
 (defun seq-data (ss)
   (slot-value ss 'data))
+
+(defun seq-map (fn sq)
+  (let ((ss (make-instance (type-of sq))))
+    (setf (slot-value ss 'data)
+          (mapcar (lambda(n) (if (or (equal (type-of n) '%sim)
+                                     (equal (type-of n) '%seq))
+                                 (seq-map fn n)
+                                 (funcall fn n)))
+            (seq-data sq)))
+    ss))
 
 (defclass %snt () (synth data release))
 (defun snt (synth &rest data)
@@ -263,7 +321,7 @@
 (defun once-every (i n r sq)
   (if (= (mod i n) r) sq nil))
 
-(defmacro defpattern (pattern-name a-synth-fn a-pattern-fn)
+(defmacro defpattern (pattern-name a-synth-fn a-pattern-fn &optional (incr 1))
   (let ((pattern-fn (read-from-string (cat pattern-name "-pattern")))
         (synth-fn   (read-from-string (cat pattern-name "-synth"))))
     `(progn
@@ -275,7 +333,10 @@
          (defun ,pattern-name (&rest args) ;; (beat &optional ,j ,a-repeats)
            (trivia:match args
              ((list :reset)
-                (setf i 0) (setf repeats +inf+) (setf stop-quant nil))
+                (setf i 0)
+                (setf j 0)
+                (setf repeats +inf+)
+                (setf stop-quant nil))
              ((list :stop)        (setf repeats 0))
              ((list :stop quant)  (setf stop-quant (clock-quant quant)))
              ((list :start)       (,pattern-name :start 1 +inf+))
@@ -285,6 +346,7 @@
                 (,pattern-name (clock-beats) 0))
              ((list :start quant reps)
                 (,pattern-name :reset)
+                (setf repeats reps)
                 (,pattern-name (clock-quant quant) 0))
              ((list beat j)
                 (when (and (< i repeats) (or (not stop-quant) (< beat stop-quant)))
@@ -303,11 +365,11 @@
                                        (or (dispatch tm delta-t el)
                                            (at-beat tm (funcall ,synth-fn tm delta-t el))))))))
                     (handler-case
-                        (dispatch beat 1 (funcall ,pattern-fn j))
+                        (dispatch beat ,incr (funcall ,pattern-fn j))
                       (error (c) (writeln "ERROR: " c))))
-                  (let ((next-beat (+ beat 1)))
+                  (let ((next-beat (+ beat ,incr)))
                     (setf i (1+ i))
-                    (clock-add next-beat #',pattern-name next-beat (1+ j)))))))))))
+                    (clock-add next-beat ',pattern-name next-beat (1+ j)))))))))))
 
 (defun play-note (snth &key
                        (synth-fn (lambda(b d s e) (declare (ignorable b d)) (when (and s e) (at-beat b (apply #'synth (cons s e))))))
@@ -332,6 +394,29 @@
                 (when (equal 'cl-collider::node (type-of s))
                   (at-beat (+ start dur) (release s))))))))))
 
+(defun play-note-attr (snth &key
+                       (synth-fn (lambda(b d s) (declare (ignorable b d))
+                                   (when s (at-beat b (apply #'synth s)))))
+                       (note-fn (lambda(e) [:freq (midicps e)]))
+                       (release t))
+  (lambda (b d e)
+    (declare (ignorable b d))
+    (when e
+      (let* ((start (+ b (or (and (listp e) (getf (cdr e) :start))
+                             (getf (cdr snth) :start 0))))
+             (s (typecase e
+                  (%snt [(apply #'synth (cons (slot-value e 'synth) (slot-value e 'data)))])
+                  (function (funcall e b d))
+                  (list (funcall synth-fn start d (append snth (funcall note-fn (car e)))))
+                  (t (funcall synth-fn start d (append snth (funcall note-fn e)))))))
+        (when release
+          (let ((dur (or (and (listp e) (getf (cdr e) :dur))
+                         (getf (cdr snth) :dur d))))
+            (if (listp s)
+                (at-beat (+ start dur) (mapcar (λ(s) (when (and s (equal 'cl-collider::node (type-of s))) (release s))) s))
+                (when (equal 'cl-collider::node (type-of s))
+                  (at-beat (+ start dur) (release s))))))))))
+
 (defun play-drum (&rest attrs)
   (λ(b d e)
     (declare (ignorable b d))
@@ -339,6 +424,16 @@
       (if (listp e)
           (apply #'synth (cons (car e) (mergeplist attrs (cdr e))))
           (apply #'synth (cons e attrs))))))
+
+(defun play-midi (mh &key (note-fn (λ(n) n)))
+  (λ(b d e)
+    (when e
+      (spawn
+        (sleep (- b (clock-beats))) 
+        (midi-note-on mh (funcall note-fn e))
+        (sleep (- (* d (/ (clock-bpm) 60)) 0.03))
+        (midi-note-off mh (funcall note-fn e))
+        ))))
 
 (defun play-seq (synth-fn ptn j)
   (labels
@@ -393,7 +488,7 @@
   (let ((ii 0))
     (loop :for i :from 0 :to (1- m)
           :collect (if (= (floor (* ii (/ m n))) i)
-                       (prog1 snt (incf ii))
+                       (prog1 (if (functionp snt) (funcall snt) snt) (incf ii))
                        nl))))
 
 (defun gen-list (lst)
@@ -460,18 +555,6 @@
   (defun cbuf (path)
     (bufnum (if-let ((val (gethash path bufs)))
                     val (setf (gethash path bufs) (buffer-read path))))))
-
-;; easier hash-map syntax
-(defun hshm (&rest args)
-  (let ((h (make-hash-table :test #'equal)))
-    (loop :for (k v) :on args :by #'cddr :do (setf (gethash k h) v))
-    h))
-
-(defun href (map key)
-  (gethash key map))
-
-(defun hset (map key value)
-  (setf (gethash key map) value))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; INSTRUMENTS
@@ -615,13 +698,14 @@
 ;; EXPORTS
 
 (export '(
-          *s* sc-init sc-connect use-gtk λ mergelist def spawn spawn-named writeln cat dur sc seql seq siml sim seq-data play-seq snt snx
-          ext-synth rand-el euclidian gen-list gen-rand gen-xrand
+          *s* sc-init sc-connect use-gtk λ mergelist def spawn spawn-named writeln cat dur sc chord
+          seql seq siml sim seq-data seq-map play-seq snt snx
+          ext-synth nsynth rand-el euclidian gen-list gen-rand gen-xrand
           loop-buf.kr loop-buf.ar
           make-mr-midi-event mr-midi-event-type mr-midi-event-note mr-midi-event-velocity mr-midi-event-start mr-midi-event-duration mr-midi-event-channel
           alsa-to-my-midi mk-midi-reader midi-reader-name midi-reader-seq midi-reader-in-port midi-reader-out-port
           start-midi-reader start-midi-writer stop-midi-reader midi-note-on midi-note-off
-          per-beat once-every defpattern play-note play-drum
+          per-beat once-every defpattern play-note play-note-attr play-drum play-midi
           csnt cbus cbuf cbus-set cbus-get cbus-in cbus-in-scale cbus-out abus abus-set abus-get abus-in abus-out
           ;; imported
           flatten curry compose if-let if-let* when-let when-let* random-elt shuffle rotate

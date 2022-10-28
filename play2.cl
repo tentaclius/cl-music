@@ -19,7 +19,7 @@
 (defpattern ssw
   (play-note 'ssaw
              :attr [:out ab1]
-             :note-fn (f_ [:freq (midicps (+ 40 (sc *chromatic* _)))]))
+             :note-fn (λ(n) [:freq (midicps (+ 40 (sc *chromatic* n)))]))
   (λ(i) 
     (sim
       (once-every i 16 5 (seq nil nil nil [12 :amp 1/4]))
@@ -55,7 +55,6 @@
              (per-beat i
                        (seq bd bd)))))
 
-(ssw :start)
 (drums :start)
 
 (drums :stop)

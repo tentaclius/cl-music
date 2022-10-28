@@ -32,7 +32,7 @@
 (defpattern sinchord
   (play-note 'sinchord
              :attr [:amp 0.6]
-             :note-fn (f_ [:note _]))
+             :note-fn (λ(n) [:note n]))
   (λ(i)
     (let ((- nil) (k 50) (h 53) (l 55)) 
       (sim (per-beat i
@@ -45,7 +45,7 @@
 (defpattern sinchord
   (play-note 'sinchord
              :attr [:amp 0.9]
-             :note-fn (f_ [:note (+ 50 _)]))
+             :note-fn (λ(n) [:note (+ 50 n)]))
   (λ(i)
     (let ((- nil)) 
       (sim (per-beat i
@@ -66,7 +66,7 @@
   (play-drum)
   (λ(i)
     (let ((o nil)
-          (d ['bd :amp 0.6 :dur 0.051])
+          (d ['bd :amp 0.6 :dur 0.011])
           (s ['bd :amp 0.1 :dur 0.04])
           (h ['hh :amp 0.2])
           (x ['hh :amp 0.16 :dur 0.015]))
@@ -97,7 +97,7 @@
   (play-note 'bass
              :release nil
              :attr [:amp 0.2]
-             :note-fn (f_ [:freq (midicps (+ 26 (sc *pentatonic* _)))]))
+             :note-fn (λ(n) [:freq (midicps (+ 26 (sc *pentatonic* n)))]))
   (λ(i)
     (sim 
       (seql (loop :repeat 8 :collect (funcall bass-seq)))

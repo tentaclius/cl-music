@@ -15,7 +15,8 @@
          (+ (* 1/2 (pink-noise.ar)))
          (lpf.ar (* fq (line.kr 10 3 0.2)))
          (* amp (env-gen.kr (perc 0.009 1) :gate gate :act :free))
-         pan2.ar (out.ar out <>))))
+         pan2.ar
+         (out.ar out <>))))
 
 (defpattern bass
   (play-note 'ssw
@@ -53,7 +54,8 @@
          (+ (sin-osc.ar fq))
          (lpf.ar (* fq 30))
          (* amp (env-gen.kr (adsr a d s r) :gate gate :act :free))
-         pan2.ar (out.ar out <>))))
+         pan2.ar
+         (out.ar out <>))))
 
 (defpattern clear-saw
   (play-note 'clear-saw

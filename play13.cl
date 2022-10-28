@@ -29,11 +29,13 @@
   (play-drum :amp 0.81)
   (λ(i)
     (let ((o nil)
+          (b ['bd :dur 0.07 :amp 0.5])
           (h ['hh :amp 0.2 :dur 0.04]))
-      (sim (once-every i 2 0 (seq o o (seq h h) o))
-           ;(seq o 'snare)
-           (per-beat i
-             (seq 'bd 'bd))))))
+      (sim
+        ;(once-every i 2 0 (seq o o (seq h h) o))
+        ;(seq o 'snare)
+        (per-beat i
+          (seq b b))))))
 
 (drums :start)
 (drums :stop)
@@ -68,3 +70,5 @@
 
 (puls :start)
 (puls :stop)
+
+(stop)

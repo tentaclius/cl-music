@@ -28,10 +28,10 @@
     (when (= 0 (mod e 8))
       (dur b 8
            ['sample-1 :buffer guitar1-buf :rate 2 :amp 2]
-           ['sample-1 :buffer guitar2-buf :rate 1 :amp 1]
+           ;['sample-1 :buffer guitar2-buf :rate 1 :amp 1]
            ['sample-1 :buffer bass-buf]
            )))
-  (λ(i) (writeln i) (seq i)))
+  (λ(i) (seq i)))
 
 (fun :start)
 (fun :stop)
