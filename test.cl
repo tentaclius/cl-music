@@ -19,7 +19,7 @@
   (λ(i) 
     (let ((s1 (seq 0 1 2 (per-beat i 1 5 7 5) (per-beat i 6 4 3) (per-beat i 8 0 -1 3 6))))
       (sim (seq-map (λ(e) (list (+ 0 e) :amp (/ 2 (+ 20 (random 20))))) s1)
-           (seq-map (λ(e) (list (+ 2 e) :amp (/ 1 (+ 20 (random 20))))) s1)
+           (seq-map (λ(e) (list (+ 2 e) :amp (/ 1 (+ 20 (random 20))) :start 1/3)) s1)
            )))
   1)
 
@@ -48,5 +48,17 @@
 
 (release :drone)
 
+(proxy :test-px
+  (-<> (abus-in :test-chan)
+       ) :pos :tail)
+(regpattern :test
+  (play-note 'ssin :attr [:out (abus :test-chan) :amp 0.1]
+             :note-fn (λ(n) [:freq (midicps (+ 54 (sc *pentatonic* n)))]))
+  (λ(i)
+    (sim [(seq 0 1 2 3) :start 1/3 :dur 0.1 :s 0.7 :r 0.1]
+         (seq 2 3 4 5))))
+
+(pstart :test)
+(pstop :test)
 
 (stop)

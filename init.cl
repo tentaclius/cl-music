@@ -350,29 +350,27 @@
 (defun once-every (i n r sq)
   (if (= (mod i n) r) sq nil))
 
-(defgeneric seq-schedule (ss snth-fn start duration))
+(defgeneric seq-schedule (ss snth-fn start duration attrs))
 
-(defmethod seq-schedule ((ss %seq) (snth-fn function) (start number) (duration number))
+(defmethod seq-schedule ((ss %seq) (snth-fn function) (start number) (duration number) (attrs list))
   (when-let* ((seq (seq-data ss))
               (delta-t (and (not (null seq)) (/ duration (length seq)))))
              (loop :for el :in seq :for j :from 0 :do
                    (let ((tm (+ start (* j delta-t))))
-                     (seq-schedule el snth-fn tm delta-t)))))
+                     (seq-schedule el snth-fn tm delta-t attrs)))))
 
-(defmethod seq-schedule ((ss %sim) (snth-fn function) (start number) (duration number))
+(defmethod seq-schedule ((ss %sim) (snth-fn function) (start number) (duration number) (attrs list))
   (loop :for el :in (seq-data ss) :do
-        (seq-schedule el snth-fn start duration)))
+        (seq-schedule el snth-fn start duration attrs)))
 
-(defmethod seq-schedule ((ss number) (synth-fn function) (start number) (duration number))
-  (at-beat start (funcall synth-fn start duration ss)))
+(defmethod seq-schedule ((ss number) (synth-fn function) (start number) (duration number) (attrs list))
+  (at-beat start (funcall synth-fn start duration (cons ss attrs))))
 
-(defmethod seq-schedule ((ss symbol) (synth-fn function) (start number) (duration number))
-  (when ss (at-beat start (funcall synth-fn start duration ss))))
+(defmethod seq-schedule ((ss symbol) (synth-fn function) (start number) (duration number) (attrs list))
+  (when ss (at-beat start (funcall synth-fn start duration (cons ss attrs)))))
 
-(defmethod seq-schedule ((ss list) (synth-fn function) (start number) (duration number))
-  (let ((st (getf (cdr ss) :start start))
-        (dr (getf (cdr ss) :dur duration)))
-    (at-beat st (funcall synth-fn st dr ss))))
+(defmethod seq-schedule ((ss list) (synth-fn function) (start number) (duration number) (attrs list))
+  (seq-schedule (car ss) synth-fn start duration (append attrs (cdr ss))))
 
 ;;;;; PATTERNS
 
@@ -414,7 +412,7 @@
                      (setf (slot-value ptn 'is-running) nil)))
                (when (slot-value ptn 'is-running)
                  (handler-case
-                     (seq-schedule (funcall (slot-value ptn 'pattern-fn) i) (slot-value ptn 'synth-fn) beat (slot-value ptn 'beat-incr))
+                     (seq-schedule (funcall (slot-value ptn 'pattern-fn) i) (slot-value ptn 'synth-fn) beat (slot-value ptn 'beat-incr) (list))
                    (error (c) (writeln "ERROR: " c)))
                  (let ((next-beat (+ beat (slot-value ptn 'beat-incr))))
                    (clock-add next-beat (slot-value ptn 'runner-fn) ptn next-beat (1+ i))))))
