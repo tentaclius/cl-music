@@ -83,14 +83,18 @@
     (loop :for (k v) :on b :by #'cddr :do (setf (getf n k) v))
     n))
 
+(defun ++. (lst &rest els)
+  (append lst els))
+
 ;; easier hash-map syntax
 (defun hshm (&rest args)
   (let ((h (make-hash-table :test #'equal)))
     (loop :for (k v) :on args :by #'cddr :do (setf (gethash k h) v))
     h))
 
-(defun href (map key)
-  (gethash key map))
+(defun href (map key &optional default)
+  (multiple-value-bind (val found?) (gethash key map)
+    (values (if found? val default) found?)))
 
 (defun hset (map key value)
   (setf (gethash key map) value))
@@ -116,8 +120,31 @@
       (loop :for vl :in vals :do (format s "~a" vl)))
     (string str)))
 
+(defun 1/ (&rest vals)
+  (apply #'/ (cons 1 vals)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MIDI
+
+;; arturia minilab mkII knob ctl
+(def
+  knob01 112
+  knob02 74 
+  knob03 71 
+  knob04 76 
+  knob05 77 
+  knob06 93 
+  knob07 73 
+  knob08 75 
+  ;
+  knob09 114
+  knob10 18 
+  knob11 19 
+  knob12 16 
+  knob13 17 
+  knob14 91 
+  knob15 79 
+  knob16 72 )
 
 (defstruct mr-midi-event
   type
@@ -292,10 +319,12 @@
 (defun seq-map (fn sq)
   (let ((ss (make-instance (type-of sq))))
     (setf (slot-value ss 'data)
-          (mapcar (lambda(n) (if (or (equal (type-of n) '%sim)
-                                     (equal (type-of n) '%seq))
-                                 (seq-map fn n)
-                                 (funcall fn n)))
+          (mapcar (lambda(n)
+                      (typecase n
+                        (%sim (seq-map fn n))
+                        (%seq (seq-map fn n))
+                        (list (cons (funcall fn (first n)) (rest n)))
+                        (t (funcall fn n))))
             (seq-data sq)))
     ss))
 
@@ -321,6 +350,87 @@
 (defun once-every (i n r sq)
   (if (= (mod i n) r) sq nil))
 
+(defgeneric seq-schedule (ss snth-fn start duration))
+
+(defmethod seq-schedule ((ss %seq) (snth-fn function) (start number) (duration number))
+  (when-let* ((seq (seq-data ss))
+              (delta-t (and (not (null seq)) (/ duration (length seq)))))
+             (loop :for el :in seq :for j :from 0 :do
+                   (let ((tm (+ start (* j delta-t))))
+                     (seq-schedule el snth-fn tm delta-t)))))
+
+(defmethod seq-schedule ((ss %sim) (snth-fn function) (start number) (duration number))
+  (loop :for el :in (seq-data ss) :do
+        (seq-schedule el snth-fn start duration)))
+
+(defmethod seq-schedule ((ss number) (synth-fn function) (start number) (duration number))
+  (at-beat start (funcall synth-fn start duration ss)))
+
+(defmethod seq-schedule ((ss symbol) (synth-fn function) (start number) (duration number))
+  (when ss (at-beat start (funcall synth-fn start duration ss))))
+
+(defmethod seq-schedule ((ss list) (synth-fn function) (start number) (duration number))
+  (let ((st (getf (cdr ss) :start start))
+        (dr (getf (cdr ss) :dur duration)))
+    (at-beat st (funcall synth-fn st dr ss))))
+
+;;;;; PATTERNS
+
+(defclass %pattern () 
+  ((is-running :initform nil)
+   (repeats :initarg :repeats
+            :initform nil)
+   (stop-quant :initarg :stop-quant
+               :initform nil)
+   (beat-incr :initarg :beat-incr
+              :initform 1)
+   (synth-fn :initarg :synth-fn
+             :initform (lambda(b d s e) (declare (ignorable b d))
+                         (when (and s e)
+                           (at-beat b (apply #'synth (cons s e))))))
+   (pattern-fn :initarg :pattern-fn)
+   (runner-fn :initarg :runner-fn)))
+
+(let ((pattern-registry (hshm)))
+  (defun pstart (name &optional (quant 1) repeats)
+    (when-let ((pattern (href pattern-registry name)))
+      (when (not (slot-value pattern 'is-running))
+        (setf (slot-value pattern 'is-running) t)
+        (setf (slot-value pattern 'repeats) repeats)
+        (setf (slot-value pattern 'stop-quant) nil)
+        (funcall (slot-value pattern 'runner-fn) pattern (clock-quant quant) 0))))
+  ;
+  (defun pstop (name &optional (reps 0))
+    (when-let ((pattern (href pattern-registry name)))
+      (setf (slot-value pattern 'repeats) reps)))
+  ;
+  (defun regpattern (name synth-fn pattern-fn &optional (beat-incr 1))
+    (multiple-value-bind (pattern found?) (href pattern-registry name)
+      (flet ((runner (ptn beat i)
+               (when-let ((reps (slot-value ptn 'repeats)))
+                 (writeln reps)
+                 (if (> reps 0)
+                     (decf (slot-value ptn 'repeats))
+                     (setf (slot-value ptn 'is-running) nil)))
+               (when (slot-value ptn 'is-running)
+                 (handler-case
+                     (seq-schedule (funcall (slot-value ptn 'pattern-fn) i) (slot-value ptn 'synth-fn) beat (slot-value ptn 'beat-incr))
+                   (error (c) (writeln "ERROR: " c)))
+                 (let ((next-beat (+ beat (slot-value ptn 'beat-incr))))
+                   (clock-add next-beat (slot-value ptn 'runner-fn) ptn next-beat (1+ i))))))
+        (if found?
+            (progn
+              (setf (slot-value pattern 'runner-fn) #'runner)
+              (setf (slot-value pattern 'pattern-fn) pattern-fn)
+              (setf (slot-value pattern 'synth-fn) synth-fn)
+              (setf (slot-value pattern 'beat-incr) beat-incr))
+            (hset pattern-registry name
+                  (make-instance '%pattern
+                                 :synth-fn synth-fn
+                                 :runner-fn #'runner
+                                 :pattern-fn pattern-fn
+                                 :beat-incr beat-incr)))))))
+
 (defmacro defpattern (pattern-name a-synth-fn a-pattern-fn &optional (incr 1))
   (let ((pattern-fn (read-from-string (cat pattern-name "-pattern")))
         (synth-fn   (read-from-string (cat pattern-name "-synth"))))
@@ -334,7 +444,6 @@
            (trivia:match args
              ((list :reset)
                 (setf i 0)
-                (setf j 0)
                 (setf repeats +inf+)
                 (setf stop-quant nil))
              ((list :stop)        (setf repeats 0))
@@ -381,12 +490,15 @@
     (when e
       (let* ((start (+ b (or (and (listp e) (getf (cdr e) :start))
                              (getf attr :start 0))))
-             (s (typecase e
-                  (%snt [(apply #'synth (cons (slot-value e 'synth) (slot-value e 'data)))])
-                  (function (funcall e b d))
-                  (list (funcall synth-fn start d snth (append (funcall note-fn (car e)) (mergeplist attr (cdr e)))))
-                  (t (funcall synth-fn start d snth (append (funcall note-fn e) attr))))))
-        (when release
+             (prb (or (and (listp e) (getf (cdr e) :prob))
+                      (getf attr :prob nil)))
+             (s (when (or (not prb) (< (random 1000000) (* prb 1000000)))
+                  (typecase e
+                    (%snt [(apply #'synth (cons (slot-value e 'synth) (slot-value e 'data)))])
+                    (function (funcall e b d))
+                    (list (funcall synth-fn start d snth (append (funcall note-fn (car e)) (mergeplist attr (cdr e)))))
+                    (t (funcall synth-fn start d snth (append (funcall note-fn e) attr)))))))
+        (when (and s release)
           (let ((dur (or (and (listp e) (getf (cdr e) :dur))
                          (getf attr :dur d))))
             (if (listp s)
@@ -422,7 +534,9 @@
     (declare (ignorable b d))
     (when (and e (not (equal e '-)))
       (if (listp e)
-          (apply #'synth (cons (car e) (mergeplist attrs (cdr e))))
+          (let ((prob (getf (cdr e) :prob nil)))
+            (when (or (not prob) (< (random 1000000) (* prob 1000000)))
+              (apply #'synth (cons (car e) (mergeplist attrs (cdr e))))))
           (apply #'synth (cons e attrs))))))
 
 (defun play-midi (mh &key (note-fn (λ(n) n)))
@@ -468,21 +582,6 @@
 (defun rand-el (&rest args)
   (random-elt args))
 
-;(defun synth-cs (name &rest args)
-;  "Start a synth by name."
-;  (let* ((name-string (symbol-name name))
-;         (next-id (or (getf args :id) (get-next-id *s*)))
-;         (to (or (getf args :to) 1))
-;         (pos (or (getf args :pos) :head))
-;         (new-synth (make-instance 'node :server *s* :id next-id :name name-string :pos pos :to to))
-;         (parameter-names (mapcar (lambda (param) (string-downcase (car param))) (synthdef-metadata name :controls)))
-;         (args (loop :for (arg val) :on args :by #'cddr
-;           :for pos = (position (string-downcase arg) parameter-names :test #'string-equal)
-;           :unless (null pos)
-;             :append (list (string-downcase (nth pos parameter-names)) (floatfy val)))))
-;    (message-distribute new-synth
-;         (apply #'make-synth-msg *s* name-string next-id to pos args)
-;         *s*)))
 
 (defun euclidian (n m snt &optional (nl nil))
   (let ((ii 0))
@@ -698,14 +797,14 @@
 ;; EXPORTS
 
 (export '(
-          *s* sc-init sc-connect use-gtk λ mergelist def spawn spawn-named writeln cat dur sc chord
+          *s* sc-init sc-connect use-gtk λ mergelist def spawn spawn-named writeln cat dur sc chord ++. 1/
           seql seq siml sim seq-data seq-map play-seq snt snx
           ext-synth nsynth rand-el euclidian gen-list gen-rand gen-xrand
           loop-buf.kr loop-buf.ar
           make-mr-midi-event mr-midi-event-type mr-midi-event-note mr-midi-event-velocity mr-midi-event-start mr-midi-event-duration mr-midi-event-channel
           alsa-to-my-midi mk-midi-reader midi-reader-name midi-reader-seq midi-reader-in-port midi-reader-out-port
           start-midi-reader start-midi-writer stop-midi-reader midi-note-on midi-note-off
-          per-beat once-every defpattern play-note play-note-attr play-drum play-midi
+          per-beat once-every regpattern defpattern pstart pstop seq-schedule play-note play-note-attr play-drum play-midi
           csnt cbus cbuf cbus-set cbus-get cbus-in cbus-in-scale cbus-out abus abus-set abus-get abus-in abus-out
           ;; imported
           flatten curry compose if-let if-let* when-let when-let* random-elt shuffle rotate

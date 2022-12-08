@@ -151,13 +151,13 @@
         (:control
          (when-let* ((knob (href *knobs* note))
                      (val  (+ (knob-value knob) (* (knob-step knob) (- velo 64)))))
-                    (setf (knob-value knob)
-                          (cond
-                            ((< val (knob-min knob)) (knob-min knob))
-                            ((> val (knob-max knob)) (knob-max knob))
-                            (t val)))
-                    (cbus-set (knob-key knob) (knob-val knob))
-                    (writeln (knob-key knob) " = " (knob-val knob))))
+           (setf (knob-value knob)
+                 (cond
+                   ((< val (knob-min knob)) (knob-min knob))
+                   ((> val (knob-max knob)) (knob-max knob))
+                   (t val)))
+           (cbus-set (knob-key knob) (knob-val knob))
+           (writeln (knob-key knob) " = " (knob-val knob))))
         ; Note
         (:note_on (chan-map chan note velo))
         (:note_off (chan-map chan note 0))
