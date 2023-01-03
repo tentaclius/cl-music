@@ -4,7 +4,7 @@
 (use-package :bdef)
 (named-readtables:in-readtable :sc)
 (init)   ;; start new server
-(bpm 60)
+(clock-bpm 60)
 
 ;;;;
 
@@ -55,7 +55,7 @@
 (defpattern drums
   (play-drum :out drums-bus)
   (λ(i) (let ((b ['bd :dur 0.001 :amp 1/2]))
-          (sim (once-every i 4 0 (seq nil nil nil (seq 'hh 'hh)))
+          (sim ;(once-every i 4 0 (seq nil nil nil (seq 'hh 'hh)))
                ;(seq nil ['snare :amp 0.6 :d 0.1])
                (per-beat i
                          (seq b b))

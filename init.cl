@@ -242,15 +242,18 @@
   (setf (midi-reader-in-port handle) nil)
   (setf (midi-reader-out-port handle) nil))
 
-(defun midi-note-on (handle note &optional (velo 127) (chan 0))
-  (when (midi-reader-out-port handle)
-    (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEON
-                          (midi-reader-seq handle) (midi-reader-out-port handle))))
-
-(defun midi-note-off (handle note &optional (velo 0) (chan 0))
-  (when (midi-reader-out-port handle)
-    (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEOFF
-                          (midi-reader-seq handle) (midi-reader-out-port handle))))
+(let ((midi-send-lock (bt:make-lock)))
+  (defun midi-note-on (handle note &optional (velo 127) (chan 0))
+    (when (midi-reader-out-port handle)
+      (bt:with-lock-held (midi-send-lock)
+        (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEON
+                              (midi-reader-seq handle) (midi-reader-out-port handle)))))
+  ;
+  (defun midi-note-off (handle note &optional (velo 0) (chan 0))
+    (when (midi-reader-out-port handle)
+      (bt:with-lock-held (midi-send-lock)
+        (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEOFF
+                              (midi-reader-seq handle) (midi-reader-out-port handle))))) )
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; SC HELPERS
@@ -347,8 +350,8 @@
     `(case (mod ,i ,len)
        ,@(loop :for el :in seqs :for n :from 0 :collect `((,n) ,el)))))
 
-(defun once-every (i n r sq)
-  (if (= (mod i n) r) sq nil))
+(defun once-every (i n r sq &optional alt)
+  (if (= (mod i n) r) sq alt))
 
 (defgeneric seq-schedule (ss snth-fn start duration attrs))
 
@@ -390,6 +393,10 @@
    (runner-fn :initarg :runner-fn)))
 
 (let ((pattern-registry (hshm)))
+  (defun pkill (name)
+    (when-let ((pattern (href pattern-registry name)))
+              (setf (slot-value pattern 'is-running) nil)))
+  ;
   (defun pstart (name &optional (quant 1) repeats)
     (when-let ((pattern (href pattern-registry name)))
       (when (not (slot-value pattern 'is-running))
@@ -406,7 +413,6 @@
     (multiple-value-bind (pattern found?) (href pattern-registry name)
       (flet ((runner (ptn beat i)
                (when-let ((reps (slot-value ptn 'repeats)))
-                 (writeln reps)
                  (if (> reps 0)
                      (decf (slot-value ptn 'repeats))
                      (setf (slot-value ptn 'is-running) nil)))
@@ -629,6 +635,43 @@
   (defun cbus-out (name val)
     (out.kr (cbus name) val)))
 
+(defstruct knob%
+  key
+  (min 0)
+  (max 127)
+  (step 1)
+  (value 0)
+  (expt nil))
+
+(let ((knob-registry (hshm)))
+  (defun knob (name value &optional (step 0.1) (min 0) (max 1) expt)
+    (let ((kn (href knob-registry name)))
+      (when (not kn)
+        (setf kn (hset knob-registry name
+                       (make-knob% :key name
+                                   :min min
+                                   :max max
+                                   :step step
+                                   :value value
+                                   :expt expt))))
+      (cbus-set name value)
+      (cbus-in name)))
+  ;
+  (defun knob-set (name midi-value)
+    (when-let* ((kn (href knob-registry name))
+                (mn (knob%-min kn))
+                (mx (knob%-max kn))
+                (vl (if (knob%-expt kn)
+                        (* (knob%-value kn) (expt (knob%-step kn) (- midi-value 64)))
+                        (+ (knob%-value kn) (* (knob%-step kn) (- midi-value 64)))))
+                (nv (cond ((> vl mx) mx) ((< vl mn) mn) (t vl))))
+      (setf (knob%-value kn) nv)
+      (cbus-set name nv)))
+  ;
+  (defun knob-value (name)
+    (when-let ((kn (href knob-registry name)))
+       (knob%-value kn))))
+
 (let ((buses (make-hash-table)))
   (defun abus (name)
     (busnum (if-let ((val (gethash name buses)))
@@ -776,7 +819,7 @@
        pan2.ar
        (out.ar out <>)))
 
-(defsynth metronome ((freq 440)(amp 0.3) (out 0))
+(defsynth metronome ((freq 440) (amp 0.3) (out 0))
   (-<> (sin-osc.ar freq)
        (+ (* 1/20 (white-noise.ar)))
        (* amp (env-gen.kr (perc 0.001 0.1) :act :free))
@@ -802,8 +845,9 @@
           make-mr-midi-event mr-midi-event-type mr-midi-event-note mr-midi-event-velocity mr-midi-event-start mr-midi-event-duration mr-midi-event-channel
           alsa-to-my-midi mk-midi-reader midi-reader-name midi-reader-seq midi-reader-in-port midi-reader-out-port
           start-midi-reader start-midi-writer stop-midi-reader midi-note-on midi-note-off
-          per-beat once-every regpattern defpattern pstart pstop seq-schedule play-note play-note-attr play-drum play-midi
+          per-beat once-every regpattern defpattern pstart pstop pkill seq-schedule play-note play-note-attr play-drum play-midi
           csnt cbus cbuf cbus-set cbus-get cbus-in cbus-in-scale cbus-out abus abus-set abus-get abus-in abus-out
+          knob knob-set knob-value knob01 knob02 knob03 knob04 knob05 knob06 knob07 knob08 knob09 knob10 knob11 knob12 knob13 knob14 knob15 knob16
           ;; imported
           flatten curry compose if-let if-let* when-let when-let* random-elt shuffle rotate
           -> ->> -<> -<>> <>
