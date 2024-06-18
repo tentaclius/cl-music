@@ -1,7 +1,7 @@
-(proxy :drone (with-controls ((f 110))
+(proxy :drone (with-controls ((f (midicps (- 50 24))))
     (-<> (dyn-klang.ar [[f (* f 2) (* f 3) (* f 5) (* f 7) (* f 8) (* f 9) (* f 10)]])
          (bpf.ar (range (sin-osc.kr 0.1) (- (* f 2) 20) (+ (* f 10) 20)) 0.08)
-         (* 0.2)
+         (* 0.3)
          ;(* 0.6 (env-gen.kr (adsr 0.002 0.1 0.6 0.4) :gate (lf-pulse.ar 6 0 0.1)))
          (freeverb.ar :room 0.7 :mix 0.7)
          pan2.ar)))
@@ -9,7 +9,7 @@
 (ctrl :drone :f 60)
 
 (proxy :drone
-       (with-controls ((freq (midicps (+ 54 12))) (amp .3))
+       (with-controls ((freq (midicps (+ 50 12))) (amp .3))
          (-<> (* 0.3 (sin-osc.ar freq))
              (+ (* 0.3 (sin-osc.ar (+ 2 freq))))
              (* amp)
@@ -17,7 +17,7 @@
              )))
 
 (proxy :drone
-       (with-controls ((drone-f (midicps 52)))
+       (with-controls ((drone-f (midicps 50)))
          (-<> (sin-osc.ar drone-f)
               (+ (* 0.4 (sin-osc.ar (* 1.5 drone-f))))
               (+ (* 0.041 (saw.ar (+ (range (sin-osc.kr 6) -8 14) (* 4 drone-f)))))

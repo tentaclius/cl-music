@@ -21,7 +21,7 @@ allpass-[lcn] <bufsize> <del-time> <decay>
             (+ <> (* 1/3 (allpass-n.ar <> 4 0.23 2)))))
 
 ;; distortions
-(clip sig lo hi)fold wrap
+(clip sig lo hi) fold wrap
 
 ;; cool echo-like effect
 greyhole

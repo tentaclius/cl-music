@@ -15,14 +15,11 @@
                 ((list* handle :off param)
                  (apply #'midi-note-off (cons handle param)))))))
 
-(defun event-handler (msg)
-  (case (mr-midi-event-type msg)
-    ((:note_on)
-     )))
-
 (def mh (mk-midi-reader "CLarp"))
-(start-midi-reader mh 'event-handler)
 (start-midi-writer mh)
+(start-midi-reader mh (lambda (msg)
+                        (case (mr-midi-event-type msg)
+                          ((:note_on)))))
 
 (defun sndnote (note &optional (velo 127) (chan 0))
   (spawn

@@ -33,13 +33,13 @@
          pan2.ar (out.ar out <>))))
 
 (proxy :ssw-fx
-       (-<> (abus-in :ssw)
+       (-<> (abus-in :ssw-bus)
             (+ <> (* 1/3 (allpass-n.ar <> 4 0.12 2)))
             ):pos :tail)
-(defpattern ssw
-  (play-note 'ssw
+
+(regpattern :ssw
+  (play-note-attr ['ssw :amp 0.4 :dur 1/2 :q 1 :depth 100 :out (abus :ssw-bus)]
              :release t
-             :attr [:amp 0.4 :dur 1/10 :q 1 :depth 100 :out (abus :ssw)]
              :note-fn (λ(n) [:freq (midicps (+ 52 -12 (sc *pentatonic* n)))]))
   (λ(i)
     (per-beat i
@@ -51,13 +51,13 @@
               ;(seql (euclidian 3 8 1 4))
               ;(seql (euclidian 3 8 2 5))
               ;(seql (euclidian 3 8 2 5))
-              (seq 3 0 -1 0 5 4 0 0)
-              (seq 0 4 5 0 0 4 0 0)
-              (seq (1+ (random 5)) 0 3 0 0 0 1 1)
-              (seq 0 0 4 0 1 0 2 0)
+              (S 3 0 -1 0 5 4 0 0)
+              (S 0 4 5 0 0 4 0 0)
+              (S (1+ (random 5)) 0 3 0 0 0 1 1)
+              (S 0 0 4 0 1 0 2 0)
               )))
 
-(defpattern drums
+(regpattern :drums
   (play-drum)
   (λ(i)
     (let ((o nil)
@@ -72,22 +72,22 @@
              (seq d d)
              )))))
 
-(defpattern drums
+(regpattern :drums
   (play-drum)
   (λ(i)
     (let ((o nil)
           (d ['bd :amp 0.7 :dur 0.0805])
           (h ['hh :amp 0.3 :dur 0.05])
           (s ['snare :d 0.1 :amp 0.6]))
-      (sim (per-beat i
-             (seq d d)
-             )))))
+      (U (per-beat i
+                   (S d d)
+                   )))))
 
-(ssw :start)
-(ssw :stop 4)
+(pstart :drums)
+(pstop :drums)
 
-(drums :start)
-(drums :stop)
+(pstart :ssw)
+(pstop :ssw)
 
 (release :drone)
 

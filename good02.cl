@@ -52,7 +52,7 @@
        (* amp (env-gen.kr (env [0 0.7 1 0] [0.001 dur d]) :act :free))
        pan2.ar (out.ar out <>)))
 
-(defpattern drums
+(regpattern :drums
   (play-drum :out drums-bus)
   (λ(i) (let ((b ['bd :dur 0.001 :amp 1/2]))
           (sim ;(once-every i 4 0 (seq nil nil nil (seq 'hh 'hh)))
@@ -61,9 +61,8 @@
                          (seq b b))
                ))))
 
-(drums :start)
-(drums :stop)
-
+(pstart :drums)
+(pstop :drums)
 
 (defsynth hbass ((freq 110) (out 0))
   (-<> (saw.ar freq)
@@ -82,22 +81,22 @@
               (* amp (env-gen.kr (adsr a d s r) :gate gate :act :free))
               pan2.ar (out.ar out <>)))))
 
-(defpattern ssw
+(regpattern :ssw
   (play-note 'fm-bass
              :attr [:out 0 :q 1 :depth 200 :amp 0.3 :a 0.0001 :r 0.01]
              ;:synth-fn (λ(b d s e) [(apply #'synth (cons s e)) (apply #'synth (cons 'ssaw (mergeplist e [:amp 0.5])))])
              :note-fn (λ(n) [:freq (midicps (+ 55 -19 (sc *pentatonic* n)))]))
-  (λ(i)
+  (let ((- nil)) (λ(i)
     (per-beat i
-              (seq nil (seq 0 0) (seq nil (once-every i 4 0 0)) (seq 0 1))
-              (seq nil 3 nil (seq 0 5))
-              )))
+              (S - (S 0 0) (S - (once-every i 4 0 0)) (S 0 1))
+              (S - 3 - (S 0 5))
+              ))))
 
-(ssw :start)
-(ssw :stop)
+(pstart :ssw)
+(pstop :ssw)
 
-(ssw :stop)
-(drums :stop)
+(pstop :ssw)
+(pstop :drums)
 
 ;;;;
 

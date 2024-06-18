@@ -18,40 +18,7 @@
   on-color
   (amp-sensitive nil)
   instance)
-;
-(proxy :mixer
-       (-<> (abus-in :master)
-            ;(if~ (cbus-in :ctl-reverb) (freeverb.ar <> :mix 0.2 :room 0.6) <>)
-            ;(if~ (cbus-in :ctl-hpf) (hpf.ar <> 2000) <>)
-            ;(if~ (cbus-in :ctl-lpf) (lpf.ar <> 200) <>)
-            ;(if~ (cbus-in :ctl-bpf) (bpf.ar <> (range (sin-osc.kr 0.4) 100 7000)) <>)
-            ) :pos :tail)
 
-;(labels ((s (synth &optional (toggle :gate) (off-color 0) (on-color *active-color*) (amp-sensitive nil))
-;           (make-padspec :synth synth :toggle toggle :off-color off-color :on-color on-color :amp-sensitive amp-sensitive))
-;         (dl (buff &optional (toggle :gate) (off-color *drumloops-color*) (on-color *active-color*))
-;           (s ['sample-loop :out (abus :master) :buffer (cbuf buff) :attack 0.001 :release 0.01 :end-loop 84662]
-;              toggle off-color on-color))
-;         (fx (buff &optional (rate 1) (toggle :once) (off-color *fx-color*) (on-color *active-color*))
-;           (s ['sample-dur :out (abus :master) :buffer (cbuf buff) :attack 0.1 :release 3 :amp 0.9 :rate rate]
-;              toggle off-color on-color))
-;         (aa (buff &optional (rate 1) (toggle :once) (off-color *fx-color*) (on-color *active-color*))
-;           (s ['sample-dur :out (abus :master) :buffer (cbuf buff) :dur 5 :attack 0.001 :release 3 :amp 0.9 :rate rate]
-;              toggle off-color on-color t))
-;         (os (buff &optional (rate 1) (toggle :gate) (off-color *oneshot-color*) (on-color *active-color*))
-;           (s ['sample :out (abus :master) :buffer (cbuf buff) :rate rate :attack 0.001 :release 1]
-;              toggle off-color on-color t))
-;         (fn (func &optional (off-color 0) (on-color *active-color*))
-;           (s func :function off-color on-color)))
-
-; 64 65 66 67  96 97 98 99
-; 60 61 62 63  92 93 94 95
-; 56 57 58 59  88 89 90 91
-; 52 53 54 55  84 85 86 87
-; 48 49 50 51  80 81 82 83
-; 44 45 46 47  76 77 78 79
-; 40 41 42 43  72 73 74 75
-; 36 37 38 39  68 69 70 71
 (def
   *active-color*     3
   *drumloops-color*  5
@@ -74,43 +41,77 @@
             64 65 66 67 96 97 98 99
             )
       :for file
-      :in (list [:file "~/Mus/samples/hang-drum/hangA3.28.wav"]
-                [:file "~/Mus/samples/hang-drum/hangD4.24.wav"]
-                [:file "~/Mus/samples/hang-drum/hangD#4.24.wav"]
-                [:file "~/Mus/samples/hang-drum/hangF#4.26.wav"]
-                [:file "~/Mus/samples/hang-drum/hangG4.27.wav"]
-                [:file "~/Mus/samples/hang-drum/hangA4.34.wav"]
-                [:file "~/Mus/samples/hang-drum/hangA#4.35.wav"]
-                [:file "~/Mus/samples/hang-drum/hangC#5.28.wav"]
-                [:file "~/Mus/samples/hang-drum/hangD5.31.wav"]
+      :in (list [:file "~/Mus/samples/hang-drum/hangA3.28.wav" :rate 6/5]
+                [:file "~/Mus/samples/hang-drum/hangD4.24.wav" :rate 6/5]
+                [:file "~/Mus/samples/hang-drum/hangD#4.24.wav" :rate 6/5]
+                [:file "~/Mus/samples/hang-drum/hangF#4.26.wav" :rate 6/5]
+                [:file "~/Mus/samples/hang-drum/hangG4.27.wav" :rate 6/5]
+                [:file "~/Mus/samples/hang-drum/hangA4.34.wav" :rate 6/5]
+                [:file "~/Mus/samples/hang-drum/hangA#4.35.wav" :rate 6/5]
+                [:file "~/Mus/samples/hang-drum/hangC#5.28.wav" :rate 6/5]
+                [:file "~/Mus/samples/hang-drum/hangD5.31.wav" :rate 6/5]
                 ;
                 [:file "~/Mus/samples/selection-drums/bass.wav" :color 5 :toggle :mono]
                 [:file "~/Mus/samples/selection-drums/bottle.wav" :color 14]
                 [:file "~/Mus/samples/selection-drums/clap.wav" :color 14]
                 [:file "~/Mus/samples/selection-drums/cowbell.wav" :color 14]
-                [:file "~/Mus/samples/selection-drums/crash.wav"]
-                [:file "~/Mus/samples/selection-drums/hh-closed.wav"]
-                [:file "~/Mus/samples/selection-drums/hh-open.wav"]
-                [:file "~/Mus/samples/selection-drums/hh-pedal.wav"]
-                [:file "~/Mus/samples/selection-drums/kick-electro-2.wav"]
-                [:file "~/Mus/samples/selection-drums/kick-electro.wav"]
-                [:file "~/Mus/samples/selection-drums/knock.wav"]
+                [:file "~/Mus/samples/selection-drums/crash.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/hh-closed.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/hh-open.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/hh-pedal.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/kick-electro-2.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/kick-electro.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/knock.wav" :color 14]
                 [:file "~/Mus/samples/selection-drums/maracas.wav" :color 14]
                 [:file "~/Mus/samples/selection-drums/pop.wav" :color 14]
                 [:file "~/Mus/samples/selection-drums/shaker.wav" :color 14]
                 [:file "~/Mus/samples/selection-drums/sleigh.wav" :color 14]
                 [:file "~/Mus/samples/selection-drums/snap.wav" :color 14]
-                [:file "~/Mus/samples/selection-drums/snare_dull.wav"]
-                [:file "~/Mus/samples/selection-drums/snare-hit.wav"]
-                [:file "~/Mus/samples/selection-drums/snare-rim.wav"]
-                [:file "~/Mus/samples/selection-drums/snare.wav"]
-                [:file "~/Mus/samples/selection-drums/tom-low.wav"]
-                [:file "~/Mus/samples/selection-drums/tom-middle.wav"]
-                [:file "~/Mus/samples/selection-drums/tom.wav"]
+                [:file "~/Mus/samples/selection-drums/snare_dull.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/snare-hit.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/snare-rim.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/snare.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/tom-low.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/tom-middle.wav" :color 14]
+                [:file "~/Mus/samples/selection-drums/tom.wav" :color 14]
+                ;
+                [:file "~/Mus/samples/selection-misc/28a-prc01-125.wav" :color 88 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/28a-prc05-125.wav" :color 88 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/28a-prc06-125.wav" :color 88 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/28a-prc07-125.wav" :color 88 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/28b-prc05-125.wav" :color 88 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/28b-prc12-125.wav" :color 88 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/28c-prc01-125.wav" :color 88 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/28c-prc05-125.wav" :color 88 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/28c-prc09-125.wav" :color 88 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/28c-prc14-125.wav" :color 88 :toggle :mono]
+                ;
+                [:file "~/Mus/samples/selection-misc/Ambiance_FX.wav" :color 56 :toggle :gate :rate 5/6 :release 1]
+                [:file "~/Mus/samples/selection-misc/Astrl_Drms.wav" :color 56 :toggle :gate :rate 5/6 :release 1]
+                [:file "~/Mus/samples/selection-misc/Csmc_Frnc_C.wav" :color 56 :toggle :gate :rate 5/6 :release 1]
+                [:file "~/Mus/samples/selection-misc/Csmc_Wvs.wav" :color 56 :toggle :gate :rate 5/6 :release 1]
+                [:file "~/Mus/samples/selection-misc/Digi_Thr_FX.wav" :color 56 :toggle :gate :rate 5/6 :release 1]
+                [:file "~/Mus/samples/selection-misc/Dl_Fltr_C.wav" :color 56 :toggle :gate :rate 5/6 :release 1]
+                [:file "~/Mus/samples/selection-misc/Dry_Wind.wav" :color 56 :toggle :gate :rate 5/6 :release 1]
+                ;
+                [:file "~/Mus/samples/selection-misc/LS_PTH_FXLOOP_002_125_G#m.wav" :color 120 :toggle :mono :amp 1/3]
+                [:file "~/Mus/samples/selection-misc/LS_PTH_KICKLOOP_001_125.wav" :color 120 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/LS_PTH_PERCUSSIONLOOP_013_125.wav" :color 120 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/LS_PTH_TOPLOOP_025_125.wav" :color 120 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/LS_TM_DRUMLOOP_017_125.wav" :color 120 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/LS_TM_DRUMLOOP_042_125.wav" :color 120 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/LS_TM_FXLOOP_011_125_F.wav" :color 120 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/LS_TM_TOPLOOP_042_125.wav" :color 120 :toggle :mono]
+                [:file "~/Mus/samples/selection-misc/Moon_Cycl.wav" :color 120 :toggle :mono]
                 )
       :do (when (and pad-id file)
             (hset *pad-map* pad-id
-                  (make-padspec :synth (list 'sample-dur :buffer (cbuf (getf file :file)) :attack 0.001 :release 0.01 :amp 0.9 :rate 1)
+                  (make-padspec :synth (list 'sample-dur
+                                             :buffer (cbuf (getf file :file))
+                                             :attack 0.007
+                                             :release (getf file :release 0.1)
+                                             :amp (getf file :amp 1/2)
+                                             :rate (getf file :rate 1))
                                 :toggle (getf file :toggle :once)
                                 :on-color 3
                                 :off-color (getf file :color 40)
@@ -161,20 +162,3 @@
 (def mh (mk-midi-reader "CLLaunchpad"))
 (start-midi-reader mh 'event-handler)
 (start-midi-writer mh)
-
-
-(proxy :drums-px
-  (-<> (abus-in :drums-chan)
-       ) :pos :tail)
-(regpattern :drums
-  (play-drum :out (abus :drums-chan))
-  (λ(i)
-    (let ((o nil)
-          (b ['bd])
-          (h ['hh])
-          (s ['snare]))
-      (per-beat i
-        (seq )))))
-
-(pstart :drums)
-(pstop :drums)

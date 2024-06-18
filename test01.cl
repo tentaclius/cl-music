@@ -459,8 +459,7 @@
              lst))
 
 (defpattern ssin
-  (play-midi mh
-             :note-fn (λ(n) (+ 50 -12 (sc *minor* n))))
+  (play-midi mh :note-fn (λ(n) (+ 50 -12 (sc *minor* n))))
   (λ(i)
     (per-beat i
               (seql (rn 4 (chord :3)) (rn 4 (chord :3 7)))

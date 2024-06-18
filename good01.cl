@@ -22,7 +22,6 @@
             )))
 
 (release :drone)
-(drums :stop)
 
 (proxy :ssnp-fx
        (-<> (abus-in :ssnp)
@@ -32,10 +31,10 @@
             (* (line.kr 0 1 10))
             ;(* (line.kr 1 0 10))
             ) :pos :tail)
-(defpattern ssnp
+(regpattern :ssnp
   (play-note 'ssaw
              :release t
-             :attr [:dur 1/15 :a 0.001 :r 0.01 :amp 0.3 :out (abus :ssnp)]
+             :attr [:dur 1/2 :a 0.001 :r 0.01 :amp 0.3 :out (abus :ssnp)]
              :note-fn (λ(n) [:freq (midicps (+ 54 (sc *pentatonic* n)))]))
   (λ(i)
     (sim
@@ -44,13 +43,13 @@
                 (seq -5 -4)
                 (seq -3 -2 -1)))))
 
-(ssnp :start)
-(ssnp :stop)
+(pstart :ssnp)
+(pstop :ssnp)
 
 (proxy :dist-fx
        (-> (abus-in :dist)
            ) :pos :tail)
-(defpattern drums
+(regpattern :drums
   (play-drum)
   (λ(i)
     (let ((o nil)
@@ -70,14 +69,10 @@
                   (seq d o (seq d b) o))
         ))))
 
-(drums :start)
-(ssnp :start)
+(pstart :drums)
+(pstop :drums)
 
-(drums :stop)
-(ssnp :stop)
-
-
-(defpattern bss
+(regpattern :bss
   (play-note 'fm-bass
              :release t
              :attr [:q 1 :depth 100]
@@ -92,8 +87,8 @@
       ))
   2)
 
-(bss :start)
-(bss :stop)
+(pstart :bss)
+(pstop :bss)
 
 (progn
   (at-beat (clock-quant 1) (release :drone))

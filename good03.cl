@@ -29,40 +29,38 @@
             (+ <> (* 1/4 (allpass-n.ar <> 3 0.2 2)))
             ):pos :tail)
 
-(defpattern sinchord
-  (play-note 'sinchord
-             :attr [:amp 0.6]
+(regpattern :sinchord
+  (play-note-attr '(sinchord :amp 0.6)
              :note-fn (λ(n) [:note n]))
   (λ(i)
     (let ((- nil) (k 50) (h 53) (l 55)) 
       (sim (per-beat i
-                     (seq k - - -  - - - -)
-                     (seq - - - -  - - h -)
-                     (seq k - - -  - - - -)
-                     (seq - - - l  - - - -)
+                     (S  k - - -  - - - -)
+                     (S  - - - -  - - h -)
+                     (S  k - - -  - - - -)
+                     (S  - - - l  - - - -)
                      )))))
 
-(defpattern sinchord
-  (play-note 'sinchord
-             :attr [:amp 0.9]
+(regpattern :sinchord
+  (play-note-attr '(sinchord :amp 0.9)
              :note-fn (λ(n) [:note (+ 50 n)]))
   (λ(i)
     (let ((- nil)) 
       (sim (per-beat i
-                     (seq 0 - - -  - - - -)
-                     (seq - - - -  - - 3 -)
-                     (seq 0 - - -  - - - -)
-                     (seq - - 5 -  - 5 - -)
-                     (seq 0 - - -  - - - -)
-                     (seq - - - -  - - 3 -)
-                     (seq 0 - - -  - - - -)
-                     (seq - - - 5  - 5 - -)
+                     (S  0 - - -  - - - -)
+                     (S  - - - -  - - 3 -)
+                     (S  0 - - -  - - - -)
+                     (S  - - 5 -  - 5 - -)
+                     (S  0 - - -  - - - -)
+                     (S  - - - -  - - 3 -)
+                     (S  0 - - -  - - - -)
+                     (S  - - - 5  - 5 - -)
                      )))))
 
-(sinchord :start 4)
-(sinchord :stop)
+(pstart :sinchord 4)
+(pstop :sinchord)
 
-(defpattern drums
+(regpattern :drums
   (play-drum)
   (λ(i)
     (let ((o nil)
@@ -77,8 +75,8 @@
                      (seq  d o o o  d o o o)
                      )))))
 
-(drums :start 4)
-(drums :stop)
+(pstart :drums 4)
+(pstop :drums)
 
 
 (defsynth bass ((freq 440) (freq0 440) (slide 0) (amp 0.3)
@@ -93,26 +91,23 @@
 
 (def bass-seq (gen-list (euclidian 7 18 0 5)))
 
-(defpattern bass
-  (play-note 'bass
+(regpattern :bass
+  (play-note-attr '(bass :amp 0.2)
              :release nil
-             :attr [:amp 0.2]
              :note-fn (λ(n) [:freq (midicps (+ 26 (sc *pentatonic* n)))]))
   (λ(i)
-    (sim 
-      (seql (loop :repeat 8 :collect (funcall bass-seq)))
-      )))
+    (U (seql (loop :repeat 8 :collect (funcall bass-seq))))))
 
-(bass :start 4)
-(bass :stop)
+(pstart :bass 4)
+(pstop :bass)
 
-(sinchord :start)
-(bass :start)
-(drums :start)
+(pstart :sinchord)
+(pstart :bass)
+(pstart :drums)
 
-(sinchord :stop)
-(bass :stop)
-(drums :stop)
+(pstop :sinchord)
+(pstop :bass)
+(pstop :drums)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; System
