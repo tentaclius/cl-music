@@ -1,5 +1,5 @@
 (require "mylisp" "init.cl")
-(require "clseqs" "./clseqs/clseqs.cl")
+(require "clseqs" "./clseqs/sequences.cl")
 (defpackage :play (:use :cl :sc :mylisp :sc-extensions :clseqs))
 (in-package :play)
 ;
@@ -42,3 +42,31 @@
   (SA (list :fn (m-play-drum))
       'bd))
 
+;;;;
+
+(require "clseqs" "./clseqs/package.cl")
+(require "clseqs-sc" "./clseqs/sc.cl")
+(require "clseqs-util" "./clseqs/util.cl")
+(require "clseqs-sequences" "./clseqs/sequences.cl")
+(use-package :clseqs)
+(use-package :sc)
+(sc-init)
+(clock-bpm 60)
+(metro-start)
+(named-readtables:in-readtable :sc)
+(init-synths)
+
+(def _ nil)
+
+(metro-add
+  :track
+  (m-tracker [] [(m-play-drum) (m-play-drum)]
+             'bd _
+             'snare 'hh
+             'hh _
+             'snare 'hh
+             ))
+
+(metro-add :track)
+
+(synth 'bd)

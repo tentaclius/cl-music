@@ -1,14 +1,8 @@
-(provide "clseqs")
-(ql:quickload :cl-collider)
-(defpackage #:clseqs (:use :cl :sc))
+(require "clseqs-util")
+(provide "clseqs-sequences")
 (in-package #:clseqs)
+(ql:quickload :cl-collider)
 
-
-(defun mergeplist (&rest args)
-  (let ((n ()))
-    (loop :for a :in args
-          :do (loop :for (k v) :on a :by #'cddr :do (setf (getf n k) v)))
-    n))
 
 (defclass <events> ()
   ((events :initarg :events
@@ -80,27 +74,34 @@
   (unless *metro-running*
     (setf *metro-running* t)
     (let ((b (ceiling (clock-beats))))
-      (clock-add b 'metro-play b 0))))
+      (sc:clock-add b 'metro-play b))))
 
 (defun metro-stop ()
   (setf *metro-running* nil))
 
-(defun metro-play (bt i)
+(defun metro-play (bt)
   (when *metro-running*
     (loop for value being each hash-values of *metro-seqs*
           :do (handler-case
                   (if (functionp value)
-                      (let ((ret (funcall value i)))
+                      (let ((ret (funcall value bt)))
                         (when (subtypep (type-of ret) '<events>)
                           (ev-schedule ret (list :start bt))))
                       (ev-schedule value (list :start bt)))
                 (error (c) (format t "ERROR ~a~%" c))))
     (let ((next-beat (1+ bt)))
-      (clock-add next-beat 'metro-play next-beat (1+ i)))))
+      (sc:clock-add next-beat 'metro-play next-beat))))
+
+;;; Helper Functions
+
+(defmacro per-beat (i &rest seqs)
+  (let ((len (length seqs)))
+    `(case (mod ,i ,len)
+       ,@(loop :for el :in seqs :for n :from 0 :collect `((,n) ,el)))))
 
 (defun m-play-drum ()
   (lambda (e a)
-    (at-beat (getf a :start 0)
+    (sc:at-beat (getf a :start 0)
              (cond
                ((not e) nil)
                ((listp e) (apply #'synth e))
@@ -113,11 +114,26 @@
            (note-len (getf a :note-len note-len))
            (note-fn  (getf a :note-fn note-fn))
            (appl     (getf a :attr attr))
-           (s        (when e (at-beat start (apply #'synth (append (list snt :freq (funcall note-fn e)) appl))))))
-      (when s (at-beat (+ start (* dur note-len)) (release s))))))
+           (s        (when e (sc:at-beat start (apply #'synth (append (list snt :freq (funcall note-fn e)) appl))))))
+      (when s (sc:at-beat (+ start (* dur note-len)) (release s))))))
 
-(export '(
-          S SL U UL SA SAL UA UAL A
+(defun m-tracker (attributes synthesizers &rest events)
+  (let ((pattern-len  (getf attributes :pattern-len :inf))
+        (step-len     (floor (/ (length events) (length synthesizers))))
+        (quant        (getf attributes :quant 1))
+        (events-rest  (list)))
+    (lambda (beat)
+      (when (or (equal pattern-len :inf) (> pattern-len 0))
+        (when (numberp pattern-len)
+          (decf pattern-len))
+        (when (and (= 0 (mod beat quant)) (null events-rest))
+          (setq events-rest (subseq events (* step-len (mod beat step-len)))))
+        (loop :for synth :in synthesizers :while (not (null events-rest)) :do
+              (ev-schedule (first events-rest) (list :fn synth :start beat))
+              (setq events-rest (rest events-rest)))))))
+
+;;;
+
+(export '(S SL U UL SA SAL UA UAL A
           ev-map metro-add metro-start metro-stop
-          m-play-drum m-play-synth
-          ))
+          m-play-drum m-play-synth m-tracker))
