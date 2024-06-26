@@ -8,6 +8,14 @@
 (use-package :sc)
 (use-package :arrow-macros)
 
+(in-package :sc)
+(defugen (loop-buf "LoopBuf")
+         (chanls bufnum &key (rate 1.0) (gate 1) (start-pos 0.0) (start-loop 0.0) (end-loop 0.0) (interpolation 2))
+         ((:ar (multinew new 'multiout-ugen chanls bufnum rate gate start-pos start-loop end-loop interpolation))
+          (:kr (multinew new 'multiout-ugen chanls bufnum rate gate start-pos start-loop end-loop interpolation))))
+(in-package :clseqs)
+
+
 (defvar *sc-started* nil)
 
 (defun sc-init (&optional (port 57110))
@@ -26,11 +34,6 @@
   (sc:server-boot sc:*s*))
 
 (defun init-synths ()
-  ;(defugen (loop-buf "LoopBuf")
-  ;         (chanls bufnum &key (rate 1.0) (gate 1) (start-pos 0.0) (start-loop 0.0) (end-loop 0.0) (interpolation 2))
-  ;         ((:ar (multinew new 'multiout-ugen chanls bufnum rate gate start-pos start-loop end-loop interpolation))
-  ;          (:kr (multinew new 'multiout-ugen chanls bufnum rate gate start-pos start-loop end-loop interpolation))))
-
   ;; General synth for playing a buffer
   (defsynth sample ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (gate 1) (attack 0.1) (release 0.1))
             (let* ((sig (play-buf.ar 2 buffer (* rate (buf-rate-scale.ir buffer))
@@ -66,19 +69,19 @@
                            (env-gen.kr (adsr 0.0001 0.0001 1 release) :gate gate :act :free))))
               (out.ar out (* amp (pan2.ar sig))) ))
 
-  ;(defsynth sample-loop ((buffer 0) (rate 1) (amp 0.5) (out 0)
-  ;                                  (start-pos 0) (start-loop 0) (end-loop 0) (interpolation 2)
-  ;                                  (attack 0.01) (release 0.1) (gate 1))
-  ;          (let* ((sig (loop-buf.ar 2 buffer
-  ;                                   :rate (* rate (buf-rate-scale.ir buffer))
-  ;                                   :gate gate
-  ;                                   :start-pos start-pos
-  ;                                   :start-loop start-loop
-  ;                                   :end-loop end-loop
-  ;                                   :interpolation interpolation
-  ;                                   ))
-  ;                 (sig (* sig amp (env-gen.kr (adsr attack 0.1 1 release) :gate gate :act :free))))
-  ;            (out.ar out sig)))
+  (defsynth sample-loop ((buffer 0) (rate 1) (amp 0.5) (out 0)
+                                    (start-pos 0) (start-loop 0) (end-loop 0) (interpolation 2)
+                                    (attack 0.01) (release 0.1) (gate 1))
+            (let* ((sig (loop-buf.ar 2 buffer
+                                     :rate (* rate (buf-rate-scale.ir buffer))
+                                     :gate gate
+                                     :start-pos start-pos
+                                     :start-loop start-loop
+                                     :end-loop end-loop
+                                     :interpolation interpolation
+                                     ))
+                   (sig (* sig amp (env-gen.kr (adsr attack 0.1 1 release) :gate gate :act :free))))
+              (out.ar out sig)))
 
   ;; Instruments
 

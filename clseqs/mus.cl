@@ -2,6 +2,10 @@
 (provide "clseqs-mus")
 (in-package #:clseqs)
 
+(ql:quickload :alexandria)
+
+(shadowing-import '(alexandria:curry))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; MIDI
 
@@ -153,6 +157,16 @@
   knob15 79 
   knob16 72 )
 
+(defvar *chromatic* #(0 1 2 3 4 5 6 7 8 9 10 11))
+(defvar *pentatonic* #(0 3 5 7 10))
+(defvar *major* #(0 2 4 5 7 9 11))
+(defvar *minor* #(0 2 3 5 7 8 10))
+
+(defun sc (scale step)
+  (if (listp step)
+      (mapcar (curry #'sc scale) step)
+      (+ (aref scale (mod step (length scale)))
+         (* 12 (floor (/ step (length scale)))) )))
 
 (defun chord (&optional (mod nil) (shift 0) (root 0) (scale *chromatic*))
   (mapcar
@@ -166,11 +180,6 @@
       ((:sus9)  (list 0 4 8))
       ((:7sus4) (list 0 2 3 6)))))
 
-(defvar *chromatic* #(0 1 2 3 4 5 6 7 8 9 10 11))
-(defvar *pentatonic* #(0 3 5 7 10))
-(defvar *major* #(0 2 4 5 7 9 11))
-(defvar *minor* #(0 2 3 5 7 8 10))
-
 (defun euclidian (n m snt &optional (nl nil))
   (let ((ii 0))
     (loop :for i :from 0 :to (1- m)
@@ -178,8 +187,19 @@
                        (prog1 (if (functionp snt) (funcall snt) snt) (incf ii))
                        (if (functionp nl) (funcall nl) nl)))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; INSTRUMENTS
+;;;
 
-
-(export '(init-synths))
+(export '(init-synths sc chord euclidian
+          *chromatic* *pentatonic* *major* *minor*
+          knob01 knob02 knob03 knob04 knob05 knob06 knob07 knob08 knob09 knob10 knob11 knob12 knob13 knob14 knob15 knob16
+          C-0 C0 C#0 Db0 D-0 D0 D#0 Eb0 E-0 E0 F-0 F0 F#0 Gb0 G-0 G0 G#0 Ab0 A-0 A0 A#0 Bb0 B-0 B0
+          C-1 C1 C#1 Db1 D-1 D1 D#1 Eb1 E-1 E1 F-1 F1 F#1 Gb1 G-1 G1 G#1 Ab1 A-1 A1 A#1 Bb1 B-1 B1
+          C-2 C2 C#2 Db2 D-2 D2 D#2 Eb2 E-2 E2 F-2 F2 F#2 Gb2 G-2 G2 G#2 Ab2 A-2 A2 A#2 Bb2 B-2 B2
+          C-3 C3 C#3 Db3 D-3 D3 D#3 Eb3 E-3 E3 F-3 F3 F#3 Gb3 G-3 G3 G#3 Ab3 A-3 A3 A#3 Bb3 B-3 B3
+          C-4 C4 C#4 Db4 D-4 D4 D#4 Eb4 E-4 E4 F-4 F4 F#4 Gb4 G-4 G4 G#4 Ab4 A-4 A4 A#4 Bb4 B-4 B4
+          C-5 C5 C#5 Db5 D-5 D5 D#5 Eb5 E-5 E5 F-5 F5 F#5 Gb5 G-5 G5 G#5 Ab5 A-5 A5 A#5 Bb5 B-5 B5
+          C-6 C6 C#6 Db6 D-6 D6 D#6 Eb6 E-6 E6 F-6 F6 F#6 Gb6 G-6 G6 G#6 Ab6 A-6 A6 A#6 Bb6 B-6 B6
+          C-7 C7 C#7 Db7 D-7 D7 D#7 Eb7 E-7 E7 F-7 F7 F#7 Gb7 G-7 G7 G#7 Ab7 A-7 A7 A#7 Bb7 B-7 B7
+          C-8 C8 C#8 Db8 D-8 D8 D#8 Eb8 E-8 E8 F-8 F8 F#8 Gb8 G-8 G8 G#8 Ab8 A-8 A8 A#8 Bb8 B-8 B8
+          C-9 C9 C#9 Db9 D-9 D9 D#9 Eb9 E-9 E9 F-9 F9 F#9 Gb9 G-9 G9
+           ))

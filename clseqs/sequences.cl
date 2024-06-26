@@ -113,7 +113,7 @@
            (dur      (getf a :dur dur))
            (note-len (getf a :note-len note-len))
            (note-fn  (getf a :note-fn note-fn))
-           (appl     (getf a :attr attr))
+           (appl     (if (getf a :attr attr)))
            (s        (when e (sc:at-beat start (apply #'synth (append (list snt :freq (funcall note-fn e)) appl))))))
       (when s (sc:at-beat (+ start (* dur note-len)) (release s))))))
 
@@ -123,7 +123,6 @@
          (steps-count  (ceiling (/ (length events) step-len)))
          (quant        (getf attributes :quant 1))
          (events-rest  (list)))
-    (writeln step-len steps-count)
     (lambda (beat)
       (when (or (equal pattern-len :inf) (> pattern-len 0))
         (when (numberp pattern-len)

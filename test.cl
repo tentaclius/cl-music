@@ -2,6 +2,7 @@
 (require "clseqs-sc" "./clseqs/sc.cl")
 (require "clseqs-util" "./clseqs/util.cl")
 (require "clseqs-sequences" "./clseqs/sequences.cl")
+(require "clseqs-mus" "./clseqs/mus.cl")
 (use-package :clseqs)
 (use-package :sc)
 (sc-init)
@@ -15,13 +16,23 @@
 (metro-add
   :track
   (m-tracker
-    [:quant 4]
-    [(m-play-drum)   (m-play-synth 'ssin :attr [:amp 1/10])]
-     'bd             (S C4 D4)
-     'snare          (S E4 F4)
-     'hh             (S G4 A4)
-     'snare          (S B4 C5)
+    []
+    [(m-play-drum)   (m-play-synth 'fm-bass :attr [:amp 1/10 :q 1 :depth 190])]
+     (S 'bd 'hh)     (U C4 E4 G4)
+     (S 'snare
+        (S _ _ 'hh 'hh)) 
+                     (U D4 G4)
+     (S (U 'bd 'hh)
+        (S 'bd 'hh))
+                     (U E4 A4)
+     (S 'snare (S _ (SA [:amp 0.001] 'hh) 'hh 'hh))
+                     (U F4 C5)
     ))
+
+(metro-add
+  :track
+  (SA [:fn (m-play-drum) :attr [:amp 0.001]]
+      ['hh :amp 0.7]))
 
 (metro-add :track)
 
