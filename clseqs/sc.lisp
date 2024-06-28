@@ -1,5 +1,5 @@
 (provide "clseqs-jack")
-(in-package :clseqs)
+(in-package #:clseqs)
 
 (ql:quickload :cl-collider)
 (ql:quickload :sc-extensions)
@@ -13,8 +13,7 @@
          (chanls bufnum &key (rate 1.0) (gate 1) (start-pos 0.0) (start-loop 0.0) (end-loop 0.0) (interpolation 2))
          ((:ar (multinew new 'multiout-ugen chanls bufnum rate gate start-pos start-loop end-loop interpolation))
           (:kr (multinew new 'multiout-ugen chanls bufnum rate gate start-pos start-loop end-loop interpolation))))
-(in-package :clseqs)
-
+(in-package #:clseqs)
 
 (defvar *sc-started* nil)
 
@@ -99,7 +98,7 @@
                                  (lpf 7) (res 1)
                                  (a 0.01) (d 0.2) (s 0.4) (r 0.4))
             (let ((fq (x-line.kr freq0 freq slide)))
-              (-<> 
+              (-<>
                 (saw.ar fq)
                 (rlpf.ar (* fq lpf) res)
                 (+ (* 1/2 (sin-osc.ar fq)))
@@ -165,7 +164,7 @@
                                             :gate (changed.ar (in.ar bus 2))
                                             :act :free)))
 
-  ) ;; init-synths 
+  ) ;; init-synths
 
 (export '(sc-init sc-connect init-synths))
 

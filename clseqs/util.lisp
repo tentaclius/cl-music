@@ -1,7 +1,6 @@
 (provide "clseqs-util")
 (ql:quickload :cl-collider)
-(defpackage :clseqs (:use :cl :sc))
-(in-package :clseqs)
+(in-package #:clseqs)
 
 (ql:quickload :bordeaux-threads)
 

@@ -1,0 +1,5 @@
+(require "clseqs" (merge-pathnames "package.lisp" *load-truename*))
+(require "clseqs-sc" (merge-pathnames "sc.lisp" *load-truename*))
+(require "clseqs-util" (merge-pathnames "util.lisp" *load-truename*))
+(require "clseqs-sequences" (merge-pathnames "sequences.lisp" *load-truename*))
+(require "clseqs-mus" (merge-pathnames "mus.lisp" *load-truename*))
