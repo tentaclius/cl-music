@@ -136,6 +136,12 @@
                  (* amp (env-gen.kr (perc 0.0 dur) :act :free))
                  pan2.ar (out.ar out <>)))
 
+  (defsynth sd ((freq 1100) (amp 0.3) (out 0) (gate 1) (a 0.001) (d 0.2))
+            (-<> (white-noise.ar)
+                 (lpf.ar freq)
+                 (* amp (env-gen.kr (perc a d) :gate gate :act :free))
+                 pan2.ar (out.ar out <>)))
+
   (defsynth snare ((freq 1100) (amp 0.3)
                                (out 0) (gate 1)
                                (a 0.001) (d 0.2))
@@ -143,6 +149,13 @@
                  (lpf.ar freq)
                  (* amp (env-gen.kr (perc a d) :gate gate :act :free))
                  pan2.ar (out.ar out <>)))
+
+  (defsynth cl ((out 0) (amp 0.5) (freq 1000))
+            (-<> (white-noise.ar)
+                 (* amp (env-gen.kr (perc 0 0.16) :act :free))
+                 (bpf.ar freq)
+                 pan2.ar
+                 (out.ar out <>)))
 
   (defsynth clap ((out 0) (amp 0.5) (freq 1000))
             (-<> (white-noise.ar)

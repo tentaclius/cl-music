@@ -83,11 +83,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defun drum-seq-1 (i)
-  (per-beat i
-            (seq 'bd 'hh 'snare 'hh)
-            (seq (seq 'bd 'bd) 'hh 'snare 'hh)))
-
 (let ((i 0)
       (running-synths (hshm)))
   (labels ((note (synth chan note velo)
@@ -138,16 +133,3 @@
 
 (stop)
 
-;;
-
-
-(defun pattern (i)
-  (per-beat i
-            (seq 'bd 'hh 'snare 'hh)
-            (seq (seq 'bd 'bd) 'hh 'snare 'hh)))
-
-(def ii 0)
-
-(play-seq (λ(b d e) (synth e)) 'pattern (incf ii))
-
-(fmakunbound 'play-seq)

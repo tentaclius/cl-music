@@ -53,3 +53,11 @@ curverange ; check this out!
 (proxy :test
   (-<> (loop-buf.ar 1 buf :rate (buf-rate-scale.ir buf) :start-pos 74000 :start-loop 74000 :end-loop 103014) ;(buf-frames.ir buf))
        (* (env-gen.kr (env [0 1 1 0] [5 1 5]))) pan2.ar))
+
+;; awesome delay/reverb snippet
+(proxy :echo
+  (let* ((sig (sound-in.ar 0))
+         (local (+ (local-in.ar 2) (dup sig))))
+    (loop :repeat 15 :do (setf local (allpass-l.ar local 0.05 0.05 1)))
+    (local-out.ar (* local 0.7))
+    (out.ar 0 local)))

@@ -182,9 +182,7 @@
               pan2.ar
               (* 0.5)
               greyhole.ar
-            )))
-
-(synth)
+              )))
 
 (release :drone)
 (free :drone)

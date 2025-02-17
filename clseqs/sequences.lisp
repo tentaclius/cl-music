@@ -107,15 +107,17 @@
                ((listp e) (apply #'synth e))
                (t (synth e))))))
 
-(defun m-play-synth (snt &key (start 0) (dur 1) (note-len 1) (note-fn (λ(f) (midicps f))) (attr (list)))
+(defun m-play-synth (snt &key (start 0) (dur 1) (note-len 1) (note-fn (λ(f) (midicps f))) (attr (list)) (release t))
   (lambda (e a)
     (let* ((start    (getf a :start start))
            (dur      (getf a :dur dur))
            (note-len (getf a :note-len note-len))
            (note-fn  (getf a :note-fn note-fn))
            (appl     (getf a :attr attr))
+           (release  (getf a :release release))
            (s        (when e (sc:at-beat start (apply #'synth (append (list snt :freq (funcall note-fn e)) appl))))))
-      (when s (sc:at-beat (+ start (* dur note-len)) (release s))))))
+      (when (and release s)
+        (sc:at-beat (+ start (* dur note-len)) (release s))))))
 
 (defun m-tracker (attributes synthesizers &rest events)
   (let* ((pattern-len  (getf attributes :pattern-len :inf))
@@ -137,4 +139,4 @@
 
 (export '(S SL U UL SA SAL UA UAL A
           ev-map metro-add metro-start metro-stop
-          m-play-drum m-play-synth m-tracker))
+          m-play-drum m-play-synth m-tracker per-beat))

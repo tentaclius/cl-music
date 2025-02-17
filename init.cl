@@ -11,6 +11,7 @@
 (ql:quickload :cl-cffi-gtk)
 (ql:quickload :cl-alsaseq)
 
+
 (in-package #:sc)
 (defugen (loop-buf "LoopBuf")
     (chanls bufnum &key (rate 1.0) (gate 1) (start-pos 0.0) (start-loop 0.0) (end-loop 0.0) (interpolation 2))
@@ -717,10 +718,10 @@
               (apply #'synth (cons (car e) (mergeplist attrs (cdr e))))))
           (apply #'synth (cons e attrs))))))
 
-;(defun m-play-drum ()
-;  (lambda (e a)
-;    (at-beat (getf a :start 0)
-;             (if (listp e) (apply #'synth e) (synth e)))))
+(defun m-play-drum ()
+  (lambda (e a)
+    (at-beat (getf a :start 0)
+             (if (listp e) (apply #'synth e) (synth e)))))
 
 (defun play-midi (mh &key (note-fn (λ(n) n)))
   (λ(b d e &optional a)
@@ -755,15 +756,15 @@
       (error (c) (writeln "ERROR: " c)))))
 
 ;;; Helper funcs for metro
-;(defun m-play-synth (snt)
-;  (lambda (e a)
-;    (let* ((start    (getf a :start 0))
-;           (dur      (getf a :dur 1))
-;           (note-len (getf a :note-len 1))
-;           (appl     (getf a :attr (list)))
-;           (s        (at-beat start (apply #'synth (append (cons snt e) appl)))))
-;      (at-beat (+ start (* dur note-len))
-;               (release s)))))
+(defun m-play-synth (snt)
+  (lambda (e a)
+    (let* ((start    (getf a :start 0))
+           (dur      (getf a :dur 1))
+           (note-len (getf a :note-len 1))
+           (appl     (getf a :attr (list)))
+           (s        (at-beat start (apply #'synth (append (cons snt e) appl)))))
+      (at-beat (+ start (* dur note-len))
+               (release s)))))
 
 (defvar *chromatic* #(0 1 2 3 4 5 6 7 8 9 10 11))
 (defvar *pentatonic* #(0 3 5 7 10))
@@ -959,15 +960,15 @@
          pan2.ar (out.ar out <>))))
 
 (defsynth saw-bass ((freq 440) (freq0 440) (slide 0) (out 0) (amp 0.5) (gate 1)
-                           (lpf 7) (res 1)
-                           (a 0.01) (d 0.2) (s 0.4) (r 0.4))
-  (let ((fq (x-line.kr freq0 freq slide)))
-    (-<> 
-      (saw.ar fq)
-      (rlpf.ar (* fq lpf) res)
-      (+ (* 1/2 (sin-osc.ar fq)))
-      (* amp (env-gen.kr (adsr a d s r) :act :free :gate gate))
-      pan2.ar (out.ar out <>))))
+                               (lpf 7) (res 1)
+                               (a 0.01) (d 0.2) (s 0.4) (r 0.4))
+          (let ((fq (x-line.kr freq0 freq slide)))
+            (-<> 
+              (saw.ar fq)
+              (rlpf.ar (* fq lpf) res)
+              (+ (* 1/2 (sin-osc.ar fq)))
+              (* amp (env-gen.kr (adsr a d s r) :act :free :gate gate))
+              pan2.ar (out.ar out <>))))
 
 (defsynth ssin ((freq 440) (freq0 440) (slide 0) (out 0) (amp 0.5) (gate 1)
                         (a 0.01) (d 0.2) (s 0.4) (r 0.4))
@@ -1033,94 +1034,94 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; updated seqs and metro
 
-;(defclass <events> ()
-;  ((events :initarg :events
-;           :initform (list)
-;           :accessor events)
-;   (attrib :initarg :attrib
-;           :initform (list)
-;           :accessor attrib)))
-;(defclass <seq> (<events>) ())
-;(defclass <sim> (<events>) ())
-;
-;(defgeneric ev-schedule (el attr))
-;
-;(defmethod ev-schedule ((el <seq>) attr)
-;    (let ((start (getf attr :start 0))
-;          (dur   (getf attr :dur 1))
-;          (len   (length (events el))))
-;      (loop :for i :from 0 :for evx :in (events el)
-;            :do (ev-schedule evx
-;                             (mergeplist attr
-;                                         (list :start (+ start (* dur (/ i len)))
-;                                               :dur (/ dur len))
-;                                         (attrib el))))))
-;
-;(defmethod ev-schedule ((el <events>) attr)
-;   (loop :for x :in (events el)
-;         :do (ev-schedule x (mergeplist attr (attrib el)))))
-;
-;(defmethod ev-schedule (el attr)
-;   (let ((fun (getf attr :fn)))
-;     (when fun (funcall fun el attr))))
-;
-;(defun S  (&rest events)  (make-instance '<seq> :events events))
-;(defun SL (events)        (make-instance '<seq> :events events))
-;(defun U  (&rest events)  (make-instance '<sim> :events events))
-;(defun UL (events)        (make-instance '<sim> :events events))
-;
-;(defun SA (attrs &rest events)
-;  (make-instance '<seq> :events events :attrib attrs))
-;(defun SAL (attrs events)
-;  (make-instance '<seq> :events events :attrib attrs))
-;(defun UA (attrs &rest events)
-;  (make-instance '<sim> :events events :attrib attrs))
-;(defun UAL (attrs events)
-;  (make-instance '<sim> :events events :attrib attrs))
+(defclass <events> ()
+  ((events :initarg :events
+           :initform (list)
+           :accessor events)
+   (attrib :initarg :attrib
+           :initform (list)
+           :accessor attrib)))
+(defclass <seq> (<events>) ())
+(defclass <sim> (<events>) ())
 
-;(defun A (attrs &rest events)
-;  (make-instance '<sim> :events events :attrib attrs))
+(defgeneric ev-schedule (el attr))
 
-;(defun ev-map (fn sq)
-;  (let ((ss (make-instance (type-of sq))))
-;    (setf (attrib ss) (attrib sq))
-;    (setf (events ss)
-;          (mapcar (lambda(n)
-;                      (if (subtypep (type-of n) '<events>)
-;                          (ev-map fn n)
-;                          (funcall fn n)))
-;            (events sq)))
-;    ss))
+(defmethod ev-schedule ((el <seq>) attr)
+    (let ((start (getf attr :start 0))
+          (dur   (getf attr :dur 1))
+          (len   (length (events el))))
+      (loop :for i :from 0 :for evx :in (events el)
+            :do (ev-schedule evx
+                             (mergeplist attr
+                                         (list :start (+ start (* dur (/ i len)))
+                                               :dur (/ dur len))
+                                         (attrib el))))))
 
-;;; Metro
+(defmethod ev-schedule ((el <events>) attr)
+   (loop :for x :in (events el)
+         :do (ev-schedule x (mergeplist attr (attrib el)))))
 
-;(defparameter *metro-seqs* (make-hash-table))
-;(defparameter *metro-running* nil)
+(defmethod ev-schedule (el attr)
+   (let ((fun (getf attr :fn)))
+     (when fun (funcall fun el attr))))
 
-;(defun metro-add (name &optional seq)
-;  (setf (gethash name *metro-seqs*) seq))
-;
-;(defun metro-start ()
-;  (unless *metro-running*
-;    (setf *metro-running* t)
-;    (let ((b (ceiling (clock-beats))))
-;      (clock-add b 'metro-play b 0))))
-;
-;(defun metro-stop ()
-;  (setf *metro-running* nil))
-;
-;(defun metro-play (bt i)
-;  (when *metro-running*
-;    (loop for value being each hash-values of *metro-seqs*
-;          :do (handler-case
-;                  (if (functionp value)
-;                      (let ((ret (funcall value i)))
-;                        (when (subtypep (type-of ret) '<events>)
-;                          (ev-schedule ret (list :start bt))))
-;                      (ev-schedule value (list :start bt)))
-;                (error (c) (writeln "ERROR " c))))
-;    (let ((next-beat (1+ bt)))
-;      (clock-add next-beat 'metro-play next-beat (1+ i)))))
+(defun S  (&rest events)  (make-instance '<seq> :events events))
+(defun SL (events)        (make-instance '<seq> :events events))
+(defun U  (&rest events)  (make-instance '<sim> :events events))
+(defun UL (events)        (make-instance '<sim> :events events))
+
+(defun SA (attrs &rest events)
+  (make-instance '<seq> :events events :attrib attrs))
+(defun SAL (attrs events)
+  (make-instance '<seq> :events events :attrib attrs))
+(defun UA (attrs &rest events)
+  (make-instance '<sim> :events events :attrib attrs))
+(defun UAL (attrs events)
+  (make-instance '<sim> :events events :attrib attrs))
+
+(defun A (attrs &rest events)
+  (make-instance '<sim> :events events :attrib attrs))
+
+(defun ev-map (fn sq)
+  (let ((ss (make-instance (type-of sq))))
+    (setf (attrib ss) (attrib sq))
+    (setf (events ss)
+          (mapcar (lambda(n)
+                      (if (subtypep (type-of n) '<events>)
+                          (ev-map fn n)
+                          (funcall fn n)))
+            (events sq)))
+    ss))
+
+;; Metro
+
+(defparameter *metro-seqs* (make-hash-table))
+(defparameter *metro-running* nil)
+
+(defun metro-add (name &optional seq)
+  (setf (gethash name *metro-seqs*) seq))
+
+(defun metro-start ()
+  (unless *metro-running*
+    (setf *metro-running* t)
+    (let ((b (ceiling (clock-beats))))
+      (clock-add b 'metro-play b 0))))
+
+(defun metro-stop ()
+  (setf *metro-running* nil))
+
+(defun metro-play (bt i)
+  (when *metro-running*
+    (loop for value being each hash-values of *metro-seqs*
+          :do (handler-case
+                  (if (functionp value)
+                      (let ((ret (funcall value i)))
+                        (when (subtypep (type-of ret) '<events>)
+                          (ev-schedule ret (list :start bt))))
+                      (ev-schedule value (list :start bt)))
+                (error (c) (writeln "ERROR " c))))
+    (let ((next-beat (1+ bt)))
+      (clock-add next-beat 'metro-play next-beat (1+ i)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; EXPORTS
@@ -1134,7 +1135,7 @@
           alsa-to-my-midi mk-midi-reader midi-reader-name midi-reader-seq midi-reader-in-port midi-reader-out-port
           start-midi-reader start-midi-writer stop-midi-reader midi-note-on midi-note-off
           per-beat per-beat-n once-every regpattern regpattern-ch defpattern pstart pstop pkill seq-schedule play-channels play-note play-note-attr play-drum play-midi
-          ;m-play-synth m-play-drum
+          m-play-synth m-play-drum
           csnt cbus cbuf cbus-set cbus-get cbus-in cbus-in-scale cbus-out abus abus-set abus-get abus-in abus-out
           knob knob-set knob-value knob-clear
           knob01 knob02 knob03 knob04 knob05 knob06 knob07 knob08 knob09 knob10 knob11 knob12 knob13 knob14 knob15 knob16
@@ -1144,7 +1145,7 @@
           bdef bdef-metadata bdef-ensure-key match
           *chromatic* *pentatonic* *major* *minor*
           hshm href hset ? ! channel
-          ;<events> <seq> <sim> ev-schedule S SA SL SAL U UA UL UAL A play-note-x metro-add metro-start metro-stop ev-map events attrib
+          <events> <seq> <sim> ev-schedule S SA SL SAL U UA UL UAL A play-note-x metro-add metro-start metro-stop ev-map events attrib
           C-0 C0 C#0 Db0 D-0 D0 D#0 Eb0 E-0 E0 F-0 F0 F#0 Gb0 G-0 G0 G#0 Ab0 A-0 A0 A#0 Bb0 B-0 B0
           C-1 C1 C#1 Db1 D-1 D1 D#1 Eb1 E-1 E1 F-1 F1 F#1 Gb1 G-1 G1 G#1 Ab1 A-1 A1 A#1 Bb1 B-1 B1
           C-2 C2 C#2 Db2 D-2 D2 D#2 Eb2 E-2 E2 F-2 F2 F#2 Gb2 G-2 G2 G#2 Ab2 A-2 A2 A#2 Bb2 B-2 B2

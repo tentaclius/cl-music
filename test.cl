@@ -1,8 +1,4 @@
 (load "clseqs/all.lisp")
-;(require :asdf)
-;(push #P"/home/aerdman/src/cl-music/clseqs/" asdf:*central-registry*)
-;(asdf:load-system :clseqs)
-;
 (use-package :clseqs)
 (use-package :sc)
 (sc-init)
@@ -12,6 +8,22 @@
 (init-synths)
 ;
 (def _ nil)
+
+(synth 'metronome :freq 880)
+(sleep 1/2)
+(synth 'metronome :freq 440)
+(sleep 1/2)
+(synth 'metronome :freq 440)
+(sleep 1/2)
+(synth 'metronome :freq 440)
+
+(metro-add
+  :metro
+  (λ(i)
+    (SA [:fn (m-play-synth 'metronome :release nil)]
+        (per-beat i (S 82 70) (S 70 70)))))
+
+(metro-add :metro)
 
 (metro-add
   :track
@@ -33,8 +45,6 @@
 
 (metro-add :track)
 
-(synth 'bd)
-
 (metro-add
   :drum
   (SAL [:fn (m-play-drum)]
@@ -44,3 +54,36 @@
 
 (metro-add :drum)
 (metro-add :snare)
+
+(synth 'bd)
+
+(proxy :echo
+  (let* ((delay 0.03)
+         (decay 0.5)
+         (sig (sound-in.ar 0))
+         (local (+ (local-in.ar 2) (dup sig))))
+    (loop :repeat 1 :do (setf local (allpass-l.ar local delay delay 1)))
+    (local-out.ar (* local decay))
+    (out.ar 0 local)))
+
+(proxy :echo nil)
+
+;; with external server
+(load "clseqs/all.lisp")
+(use-package :sc)
+(use-package :clseqs)
+;(sc-connect)
+(sc-init)
+(init-synths)
+
+(synth 'clap)
+
+(metro-add
+  :clap
+  (λ(i)
+    (SA [:fn (m-play-drum)]
+        (per-beat i
+                  (S (U 'bd 'cl) 'hh 'hh 'hh 'hh 'hh 'hh (U 'hh (per-beat-n 4 i 'bd _)))
+                  (S (U 'bd 'cl) 'hh 'hh 'clap 'hh (U 'bd 'hh) 'cl 'hh)))))
+
+(stop)

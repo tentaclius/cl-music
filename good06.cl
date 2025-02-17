@@ -4,6 +4,7 @@
 (named-readtables:in-readtable :sc)
 (sc-init)
 (bpm 60)
+(metro-start)
 
 ;;;;
 
@@ -42,7 +43,7 @@
          (bpf.ar (range (sin-osc.kr 0.1) (- (* f 2) 20) (+ (* f 10) 20)) 0.08)
          (* 0.3)
          (* 0.6 (env-gen.kr (adsr 0.002 0.1 0.6 0.4) :gate (lf-pulse.ar 6 0 0.1)))
-         (freeverb.ar :room 0.7 :mix 0.7)
+         ;(freeverb.ar :room 0.7 :mix 0.7)
          pan2.ar)))
 
 (metro-add :beat)
