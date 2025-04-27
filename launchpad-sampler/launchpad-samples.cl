@@ -4,7 +4,6 @@
 (defpackage :cl-launchpad (:use :cl :sc))
 (in-package :cl-launchpad)
 
-;;;
 (defstruct mr-midi-event
   type
   note
@@ -78,17 +77,11 @@
     (when out-port
       (bt:with-lock-held (midi-send-lock)
                          (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEON
-                                               (cffi:mem-ref midi-seq :pointer) out-port))))
-
-  (defun midi-note-off (note &optional (velo 0) (chan 0))
-    (when out-port
-      (bt:with-lock-held (midi-send-lock)
-                         (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEOFF
                                                (cffi:mem-ref midi-seq :pointer) out-port)))))
 
-(defun init-midi (event-handler)
+(defun midi-init ()
   (restart-midi)
-  (start-midi-reader event-handler)
+  (start-midi-reader 'midi-event-handler)
   (start-midi-writer))
 
 (let ((sc-started nil))
@@ -112,89 +105,98 @@
                          (env-gen.kr (adsr 0.0001 0.0001 1 release) :gate gate :act :free))))
             (out.ar out (* amp sig)) ))))))
 
-;;;
+(let ((bufs (make-hash-table :test #'equal)))
+  (defun cbuf (path)
+    (bufnum (let ((val (gethash path bufs)))
+              (or val
+                  (setf (gethash path bufs) (buffer-read path)))))))
 
-(defstruct padspec
+(defstruct (pad (:constructor create-pad))
+  note
   synth
   toggle
   off-color
   on-color
-  (amp-sensitive nil)
+  amp-sensitive
   instance)
 
-(def
-  *active-color*     3
-  *drumloops-color*  5
-  *fx-color*         18
-  *noise-color*      14
-  *oneshot-color*    40
-  *fn-on-color*      18
-  *fn-off-color*     5)
+(defun make-pad (&key note synth (toggle :oneshot) (off-color 40) (on-color 3) (amp-sensitive t)
+                      file (attack 0.007) (release 0.1) (gain 1/2) (rate 1))
+  (create-pad :synth (or synth
+                         (list 'sample-dur
+                               :buffer (cbuf file)
+                               :attack attack
+                               :release release
+                               :amp gain
+                               :rate rate))
+              :note note
+              :toggle toggle
+              :on-color on-color
+              :off-color off-color
+              :amp-sensitive amp-sensitive))
 
-(def *pad-map* (hshm))
-
-(defun dispatch-play (padspec note velo channel)
-  (case (padspec-toggle padspec)
-    (:once
-      (apply #'synth (if (padspec-amp-sensitive padspec)
-                       (append (padspec-synth padspec) [:amp (/ velo 127)])
-                       (padspec-synth padspec))))
+(defun dispatch-play (pad note velo)
+  (case (pad-toggle pad)
+    (:oneshot
+      (apply #'synth (if (pad-amp-sensitive pad)
+                       (append (pad-synth pad) (list :amp (/ velo 127)))
+                       (pad-synth pad))))
     (:gate
-      (setf (padspec-instance padspec)
-            (apply #'synth (if (padspec-amp-sensitive padspec)
-                             (append (padspec-synth padspec) [:amp (/ velo 127)])
-                             (padspec-synth padspec)))))
+      (setf (pad-instance pad)
+            (apply #'synth (if (pad-amp-sensitive pad)
+                             (append (pad-synth pad) (list :amp (/ velo 127)))
+                             (pad-synth pad)))))
     (:mono
-      (csnt note (apply #'synth
-                        (if (padspec-amp-sensitive padspec)
-                          (append (padspec-synth padspec) [:amp (/ velo 127)])
-                          (padspec-synth padspec)))))
+      (let ((p (pad-instance pad)))
+        (and p (is-playing-p p)
+             (release p)))
+      (setf (pad-instance pad)
+            (apply #'synth
+                   (if (pad-amp-sensitive pad)
+                     (append (pad-synth pad) (list :amp (/ velo 127)))
+                     (pad-synth pad)))))
     (:function
-      (funcall (padspec-synth padspec) padspec note (/ velo 127))))
-  (when (not (functionp (padspec-synth padspec)))
-    (midi-note-on note (padspec-on-color padspec))))
+      (funcall (pad-synth pad) pad note (/ velo 127))))
+  (when (not (functionp (pad-synth pad)))
+    (midi-note-on note (pad-on-color pad))))
 
-(defun dispatch-stop (padspec note velo channel)
-  (if (not (functionp (padspec-synth padspec)))
+(defun dispatch-stop (pad note)
+  (if (not (functionp (pad-synth pad)))
     ;; synth, stop it
     (progn
-      (let ((s (padspec-instance padspec)))
-        (when s
-          (when (is-playing-p s) (release s))
-          (setf (padspec-instance padspec) nil)))
-      (midi-note-on note (padspec-off-color padspec)))
+      (let ((s (pad-instance pad))) (and s (is-playing-p s) (release s)))
+      (setf (pad-instance pad) nil)
+      (midi-note-on note (pad-off-color pad)))
     ;; function, call it again
-    (funcall (padspec-synth padspec) padspec note 0)))
+    (funcall (pad-synth pad) pad note 0)))
 
-(defun play-pad (note velo channel)
-  (let ((padspec (href *pad-map* note)))
-    (if (and padspec (> velo 0))
-      (dispatch-play padspec note velo channel)
-      (dispatch-stop padspec note velo channel))))
+(let ((pad-map (make-hash-table)))
+  (defun pad-map-redraw ()
+    (maphash (lambda (note pad) (midi-note-on note (pad-off-color pad)))
+             pad-map))
+  (defun pad-get (note)
+    (gethash note pad-map))
+  (defun pad-map (lst)
+    (loop :for pad :in lst
+          :do (setf (gethash (pad-note pad) pad-map) pad))
+    (pad-map-redraw))
+  (defun pad-map-reset (&optional lst)
+    (setf pad-map (make-hash-table))
+    (pad-map lst)))
 
-(defun event-handler (msg)
+(defun play-pad (note velo)
+  (let ((pad (pad-get note)))
+    (if (and pad (> velo 0))
+      (dispatch-play pad note velo)
+      (dispatch-stop pad note))))
+
+(defun midi-event-handler (msg)
   (when msg
     (case (mr-midi-event-type msg)
       ((:note_on :note_off)
-       (midi-note-on (mr-midi-event-note msg) (mr-midi-event-velocity msg) (mr-midi-event-channel msg))))))
+       (play-pad (mr-midi-event-note msg) (mr-midi-event-velocity msg))))))
 
-(defun pad-layout (mappings)
-  (loop :for file :in mappings
-        :do (setf (gethash (getf :note file) *pad-map*)
-                  (make-padspec :synth (list 'sample-dur
-                                             :buffer (cbuf (getf file :file))
-                                             :attack 0.007
-                                             :release (getf file :release 0.1)
-                                             :amp (getf file :amp 1/2)
-                                             :rate (getf file :rate 1))
-                                :toggle (getf file :toggle :once)
-                                :on-color 3
-                                :off-color (getf file :color 40)
-                                :amp-sensitive (getf file :sensitive t)))))
-
-(init-midi 'event-handler)
-
-(init-midi (lambda (msg) (format t "~a~%" msg)))
+(export '(midi-init sc-init pad-map make-pad pad-map-reset pad-map-redraw))
 
 ; 36 37 38 39 68 69 70 71
 ; 40 41 42 43 72 73 74 75
@@ -204,4 +206,3 @@
 ; 56 57 58 59 88 89 90 91
 ; 60 61 62 63 92 93 94 95
 ; 64 65 66 67 96 97 98 99
-
