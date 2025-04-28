@@ -32,6 +32,14 @@
   (setf sc:*s* (sc:make-external-server "localhost" :port port :just-connect-p t))
   (sc:server-boot sc:*s*))
 
+(let ((synths (make-hash-table)))
+  (defmacro csnt (name value)
+    (if value 
+        `(progn
+           (let ((s (gethash ,name ,synths))) (and s (is-playing-p s) (release s)))
+           (setf (gethash ,name ,synths) ,value))
+        `(gethash ,name ,synths))))
+
 (defun init-synths ()
   ;; General synth for playing a buffer
   (defsynth sample ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (gate 1) (attack 0.1) (release 0.1))

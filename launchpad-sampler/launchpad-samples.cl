@@ -77,6 +77,12 @@
     (when out-port
       (bt:with-lock-held (midi-send-lock)
                          (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEON
+                                               (cffi:mem-ref midi-seq :pointer) out-port))))
+
+  (defun midi-note-off (note &optional (velo 0) (chan 0))
+    (when out-port
+      (bt:with-lock-held (midi-send-lock)
+                         (cl-alsaseq:send-note velo note chan :SND_SEQ_EVENT_NOTEOFF
                                                (cffi:mem-ref midi-seq :pointer) out-port)))))
 
 (defun midi-init ()
@@ -96,14 +102,14 @@
         (jack-connect)
 
         (defsynth
-          sample-dur ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (gate 1) (dur 60) (attack 0.001) (release 0.1))
+          sample-dur ((buffer 0) (rate 1) (start 0) (gain 0.5) (out 0) (loop 0) (gate 1) (dur 60) (attack 0.001) (release 0.1))
           (let* ((sig (play-buf.ar 2 buffer (* rate (buf-rate-scale.ir buffer))
                                    :start-pos (* start (/ (buf-frames.ir buffer) (buf-channels.ir buffer)))
                                    :loop loop
                                    :act :free))
                  (sig (* sig (env-gen.kr (linen attack (- dur attack release) release) :act :free)
                          (env-gen.kr (adsr 0.0001 0.0001 1 release) :gate gate :act :free))))
-            (out.ar out (* amp sig)) ))))))
+            (out.ar out (* gain sig)) ))))))
 
 (let ((bufs (make-hash-table :test #'equal)))
   (defun cbuf (path)
@@ -127,7 +133,7 @@
                                :buffer (cbuf file)
                                :attack attack
                                :release release
-                               :amp gain
+                               :gain gain
                                :rate rate))
               :note note
               :toggle toggle
@@ -139,12 +145,12 @@
   (case (pad-toggle pad)
     (:oneshot
       (apply #'synth (if (pad-amp-sensitive pad)
-                       (append (pad-synth pad) (list :amp (/ velo 127)))
+                       (append (pad-synth pad) (list :gain (/ velo 127)))
                        (pad-synth pad))))
     (:gate
       (setf (pad-instance pad)
             (apply #'synth (if (pad-amp-sensitive pad)
-                             (append (pad-synth pad) (list :amp (/ velo 127)))
+                             (append (pad-synth pad) (list :gain (/ velo 127)))
                              (pad-synth pad)))))
     (:mono
       (let ((p (pad-instance pad)))
@@ -153,11 +159,11 @@
       (setf (pad-instance pad)
             (apply #'synth
                    (if (pad-amp-sensitive pad)
-                     (append (pad-synth pad) (list :amp (/ velo 127)))
+                     (append (pad-synth pad) (list :gain (/ velo 127)))
                      (pad-synth pad)))))
     (:function
       (funcall (pad-synth pad) pad note (/ velo 127))))
-  (when (not (functionp (pad-synth pad)))
+  (when (pad-on-color pad)
     (midi-note-on note (pad-on-color pad))))
 
 (defun dispatch-stop (pad note)
@@ -168,10 +174,13 @@
       (setf (pad-instance pad) nil)
       (midi-note-on note (pad-off-color pad)))
     ;; function, call it again
-    (funcall (pad-synth pad) pad note 0)))
+    (progn
+      (and (pad-off-color pad) (midi-note-on note (pad-off-color pad)))
+      (funcall (pad-synth pad) pad note 0))))
 
 (let ((pad-map (make-hash-table)))
   (defun pad-map-redraw ()
+    (loop :for n :from 36 :to 100 :do (midi-note-off n))
     (maphash (lambda (note pad) (midi-note-on note (pad-off-color pad)))
              pad-map))
   (defun pad-get (note)
@@ -180,15 +189,16 @@
     (loop :for pad :in lst
           :do (setf (gethash (pad-note pad) pad-map) pad))
     (pad-map-redraw))
-  (defun pad-map-reset (&optional lst)
+  (defun pad-remap (&optional lst)
     (setf pad-map (make-hash-table))
     (pad-map lst)))
 
 (defun play-pad (note velo)
   (let ((pad (pad-get note)))
-    (if (and pad (> velo 0))
-      (dispatch-play pad note velo)
-      (dispatch-stop pad note))))
+    (when pad
+      (if (and pad (> velo 0))
+        (dispatch-play pad note velo)
+        (dispatch-stop pad note)))))
 
 (defun midi-event-handler (msg)
   (when msg
@@ -196,7 +206,7 @@
       ((:note_on :note_off)
        (play-pad (mr-midi-event-note msg) (mr-midi-event-velocity msg))))))
 
-(export '(midi-init sc-init pad-map make-pad pad-map-reset pad-map-redraw))
+(export '(midi-init sc-init pad-map make-pad pad-remap pad-map-redraw easy-init))
 
 ; 36 37 38 39 68 69 70 71
 ; 40 41 42 43 72 73 74 75
