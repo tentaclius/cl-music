@@ -102,13 +102,14 @@
         (jack-connect)
 
         (defsynth
-          sample-dur ((buffer 0) (rate 1) (start 0) (gain 0.5) (out 0) (loop 0) (gate 1) (dur 60) (attack 0.001) (release 0.1))
-          (let* ((sig (play-buf.ar 2 buffer (* rate (buf-rate-scale.ir buffer))
+          launchpad-sample-player ((buffer 0) (rate 1) (start 0) (gain 0.5) (out 0) (loop 0) (gate 1) (dur 60) (attack 0.001) (release 0.1))
+          (let* ((sig (play-buf.ar 1 buffer (* rate (buf-rate-scale.ir buffer))
                                    :start-pos (* start (/ (buf-frames.ir buffer) (buf-channels.ir buffer)))
                                    :loop loop
                                    :act :free))
                  (sig (* sig (env-gen.kr (linen attack (- dur attack release) release) :act :free)
-                         (env-gen.kr (adsr 0.0001 0.0001 1 release) :gate gate :act :free))))
+                         (env-gen.kr (adsr 0.0001 0.0001 1 release) :gate gate :act :free)))
+                 (sig (pan2.ar sig)))
             (out.ar out (* gain sig)) ))))))
 
 (let ((bufs (make-hash-table :test #'equal)))
@@ -126,15 +127,16 @@
   amp-sensitive
   instance)
 
-(defun make-pad (&key note synth (toggle :oneshot) (off-color 40) (on-color 3) (amp-sensitive t)
+(defun make-pad (&key note synth toggle (off-color 40) (on-color 3) (amp-sensitive t)
                       file (attack 0.007) (release 0.1) (gain 1/2) (rate 1))
   (create-pad :synth (or synth
-                         (list 'sample-dur
-                               :buffer (cbuf file)
-                               :attack attack
-                               :release release
-                               :gain gain
-                               :rate rate))
+                         (and file
+                              (list 'launchpad-sample-player
+                                    :buffer (cbuf file)
+                                    :attack attack
+                                    :release release
+                                    :gain gain
+                                    :rate rate)))
               :note note
               :toggle toggle
               :on-color on-color
@@ -167,16 +169,15 @@
     (midi-note-on note (pad-on-color pad))))
 
 (defun dispatch-stop (pad note)
-  (if (not (functionp (pad-synth pad)))
+  (when (pad-off-color pad)
+    (midi-note-on note (pad-off-color pad)))
+  (if (functionp (pad-synth pad))
+    ;; function, call it again
+    (funcall (pad-synth pad) pad note 0)
     ;; synth, stop it
     (progn
       (let ((s (pad-instance pad))) (and s (is-playing-p s) (release s)))
-      (setf (pad-instance pad) nil)
-      (midi-note-on note (pad-off-color pad)))
-    ;; function, call it again
-    (progn
-      (and (pad-off-color pad) (midi-note-on note (pad-off-color pad)))
-      (funcall (pad-synth pad) pad note 0))))
+      (setf (pad-instance pad) nil))))
 
 (let ((pad-map (make-hash-table)))
   (defun pad-map-redraw ()

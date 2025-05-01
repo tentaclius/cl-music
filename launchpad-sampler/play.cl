@@ -14,11 +14,25 @@
 
 (defsynth
   sawww ((freq 440) (dur 1) (a 0.001) (r 1) (gain 0.5) (out 0) (gate 1))
-  (-<> (saw.ar freq)
+  (-<> (+ freq (* (sin-osc.kr 5) (line.kr 0.001 3 dur)))
+       (saw.ar)
        (* gain
-          (env-gen.kr (env [0 1 1 0] [a dur r]) :act :free)
+          (env-gen.kr (env [0 1 0.6 0.6 0] [a 0.1 dur r]) :act :free)
           (env-gen.kr (asr 0 1 r) :gate gate :act :free))
-       (lpf.ar (* freq 4))
+       (lpf.ar (* freq 5))
+       (pan2.ar)
+       (out.ar out <>)))
+
+(defsynth
+  chord ((freq 440) (dur 1) (a 0.01) (r 1) (gain 0.5) (out 0) (gate 1))
+  (-<> (+ (sin-osc.ar freq)
+          (sin-osc.ar (* freq 1.5))
+          (sin-osc.ar (* freq 2)))
+       (* 1/3)
+       (* gain
+          (env-gen.kr (env [0 1 0.6 0.6 0] [a 0.1 dur r]) :act :free)
+          (env-gen.kr (asr 0 1 r) :gate gate :act :free))
+       (pan2.ar)
        (out.ar out <>)))
 
 ; 64 65 66 67 96 97 98 99
@@ -37,7 +51,16 @@
               :synth (λ(pad note velo)
                        (when (> velo 0)
                          (and saw-instance (is-playing-p saw-instance) (release saw-instance))
-                         (setf saw-instance (synth 'sawww :freq (midicps (+ C-2 (sc *pentatonic* n))) :dur 1 :r 0.4 :gain 1)))))))
+                         (setf saw-instance (synth 'sawww :freq (midicps (+ C-2 (sc *pentatonic* n))) :dur 2 :r 0.4 :gain 1/2)))))))
+;;
+(let ((chord-instance nil))
+  (defun make-sin (note n)
+    (make-pad :note note :toggle :function
+              :off-color 56 :on-color 33
+              :synth (λ(pad note velo)
+                       (when (> velo 0)
+                         (and chord-instance (is-playing-p chord-instance) (release chord-instance))
+                         (setf chord-instance (synth 'chord :freq (midicps (+ C-3 (sc *pentatonic* n))) :dur 2 :r 0.5 :gain 1/2)))))))
 ;;
 (pad-remap
   [(make-pad :note 75 :file "~/Mus/Samples/selection/HatClosed-Med.wav")
@@ -47,4 +70,14 @@
    (make-sawww 40 1)
    (make-sawww 44 2)
    (make-sawww 48 3)
-   (make-sawww 52 4)])
+   (make-sawww 52 4)
+   (make-sin 37 0)
+   (make-sin 41 1)
+   (make-sin 45 2)
+   (make-sin 49 3)
+   (make-sin 53 4)
+   (make-pad :note 99 :on-color 60 :off-color 6)
+   (make-pad :note 98 :on-color 69 :off-color 70)
+   (make-pad :note 95 :on-color 60 :off-color 6)
+   (make-pad :note 94 :on-color 69 :off-color 70)
+   ])
