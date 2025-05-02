@@ -102,7 +102,7 @@
         (jack-connect)
 
         (defsynth
-          launchpad-sample-player ((buffer 0) (rate 1) (start 0) (gain 0.5) (out 0) (loop 0) (gate 1) (dur 60) (attack 0.001) (release 0.1))
+          launchpad-sample-player ((buffer 0) (rate 1) (start 0) (amp 0.5) (out 0) (loop 0) (gate 1) (dur 60) (attack 0.001) (release 0.1))
           (let* ((sig (play-buf.ar 1 buffer (* rate (buf-rate-scale.ir buffer))
                                    :start-pos (* start (/ (buf-frames.ir buffer) (buf-channels.ir buffer)))
                                    :loop loop
@@ -110,7 +110,7 @@
                  (sig (* sig (env-gen.kr (linen attack (- dur attack release) release) :act :free)
                          (env-gen.kr (adsr 0.0001 0.0001 1 release) :gate gate :act :free)))
                  (sig (pan2.ar sig)))
-            (out.ar out (* gain sig)) ))))))
+            (out.ar out (* amp sig)) ))))))
 
 (let ((bufs (make-hash-table :test #'equal)))
   (defun cbuf (path)
@@ -122,23 +122,24 @@
   note
   synth
   toggle
+  amp
   off-color
   on-color
   amp-sensitive
   instance)
 
-(defun make-pad (&key note synth toggle (off-color 40) (on-color 3) (amp-sensitive t)
-                      file (attack 0.007) (release 0.1) (gain 1/2) (rate 1))
+(defun make-pad (&key note synth (toggle :oneshot) (off-color 40) (on-color 3) (amp-sensitive t)
+                      file (attack 0.007) (release 0.1) (amp 1/2) (rate 1))
   (create-pad :synth (or synth
                          (and file
                               (list 'launchpad-sample-player
                                     :buffer (cbuf file)
                                     :attack attack
                                     :release release
-                                    :gain gain
                                     :rate rate)))
               :note note
               :toggle toggle
+              :amp amp
               :on-color on-color
               :off-color off-color
               :amp-sensitive amp-sensitive))
@@ -147,12 +148,12 @@
   (case (pad-toggle pad)
     (:oneshot
       (apply #'synth (if (pad-amp-sensitive pad)
-                       (append (pad-synth pad) (list :gain (/ velo 127)))
+                       (append (pad-synth pad) (list :amp (* (or (pad-amp pad) 1) velo 1/127)))
                        (pad-synth pad))))
     (:gate
       (setf (pad-instance pad)
             (apply #'synth (if (pad-amp-sensitive pad)
-                             (append (pad-synth pad) (list :gain (/ velo 127)))
+                             (append (pad-synth pad) (list :amp (/ velo 127)))
                              (pad-synth pad)))))
     (:mono
       (let ((p (pad-instance pad)))
@@ -161,7 +162,7 @@
       (setf (pad-instance pad)
             (apply #'synth
                    (if (pad-amp-sensitive pad)
-                     (append (pad-synth pad) (list :gain (/ velo 127)))
+                     (append (pad-synth pad) (list :amp (/ velo 127)))
                      (pad-synth pad)))))
     (:function
       (funcall (pad-synth pad) pad note (/ velo 127))))
